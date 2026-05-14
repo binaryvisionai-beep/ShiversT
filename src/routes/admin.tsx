@@ -23,7 +23,7 @@ function Shell() {
   return (
     <div
       className="min-h-screen bg-background text-foreground"
-      style={{ ["--sb-w" as never]: collapsed ? "80px" : "280px" }}
+      style={{ "--sb-w": collapsed ? "80px" : "280px" } as React.CSSProperties}
     >
       <AdminSidebar />
       <motion.div
