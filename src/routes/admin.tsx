@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { SidebarProvider, useSidebarState } from "@/components/admin/sidebar-context";
+import { SidebarProvider } from "@/components/admin/sidebar-context";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 
@@ -17,19 +17,12 @@ function AdminLayout() {
 }
 
 function Shell() {
-  const { collapsed } = useSidebarState();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
-    <div
-      className="min-h-screen bg-background text-foreground"
-      style={{ "--sb-w": collapsed ? "76px" : "252px" } as React.CSSProperties}
-    >
+    <div className="min-h-screen flex bg-background text-foreground">
       <AdminSidebar />
-      <motion.div
-        animate={{ paddingLeft: 0 }}
-        className="min-h-screen flex flex-col md:[padding-left:var(--sb-w)] transition-[padding] duration-300 ease-out"
-      >
+      <div className="flex-1 min-w-0 flex flex-col">
         <AdminTopbar />
         <main className="flex-1 p-4 sm:p-6 lg:p-10">
           <AnimatePresence mode="wait">
@@ -44,7 +37,7 @@ function Shell() {
             </motion.div>
           </AnimatePresence>
         </main>
-      </motion.div>
+      </div>
     </div>
   );
 }
