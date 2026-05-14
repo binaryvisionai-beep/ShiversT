@@ -60,7 +60,7 @@ export function AdminSidebar() {
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarState();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const width = collapsed ? 80 : 280;
+  const width = collapsed ? 76 : 252;
 
   const content = (
     <TooltipProvider delayDuration={100}>
