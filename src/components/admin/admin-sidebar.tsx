@@ -60,7 +60,7 @@ export function AdminSidebar() {
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarState();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const width = collapsed ? 76 : 252;
+  const width = collapsed ? 88 : 280;
 
   const content = (
     <TooltipProvider delayDuration={100}>
@@ -68,7 +68,7 @@ export function AdminSidebar() {
         initial={false}
         animate={{ width }}
         transition={{ type: "spring", stiffness: 260, damping: 30 }}
-        className="hidden md:flex fixed inset-y-0 left-0 z-40 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border overflow-hidden"
+        className="hidden md:flex sticky top-0 h-screen z-40 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border overflow-hidden shrink-0"
       >
         <SidebarInner />
         <button
