@@ -23,7 +23,7 @@ function Shell() {
   return (
     <div
       className="min-h-screen bg-background text-foreground"
-      style={{ "--sb-w": collapsed ? "80px" : "280px" } as React.CSSProperties}
+      style={{ "--sb-w": collapsed ? "76px" : "252px" } as React.CSSProperties}
     >
       <AdminSidebar />
       <motion.div
@@ -31,7 +31,7 @@ function Shell() {
         className="min-h-screen flex flex-col md:[padding-left:var(--sb-w)] transition-[padding] duration-300 ease-out"
       >
         <AdminTopbar />
-        <main className="flex-1 p-4 md:p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-10">
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
