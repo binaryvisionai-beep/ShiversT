@@ -19,18 +19,17 @@ function AdminLayout() {
 function Shell() {
   const { collapsed } = useSidebarState();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const ml = collapsed ? 80 : 280;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div
+      className="min-h-screen bg-background text-foreground"
+      style={{ ["--sb-w" as never]: collapsed ? "80px" : "280px" }}
+    >
       <AdminSidebar />
       <motion.div
-        animate={{ marginLeft: ml }}
-        transition={{ type: "spring", stiffness: 260, damping: 30 }}
-        className="md:ml-[280px] min-h-screen flex flex-col"
-        style={{ marginLeft: undefined }}
+        animate={{ paddingLeft: 0 }}
+        className="min-h-screen flex flex-col md:[padding-left:var(--sb-w)] transition-[padding] duration-300 ease-out"
       >
-        <div className="hidden md:block" style={{ marginLeft: 0 }} />
         <AdminTopbar />
         <main className="flex-1 p-4 md:p-8">
           <AnimatePresence mode="wait">
