@@ -52,6 +52,7 @@
 }
 
 :root {
+  color-scheme: light;
   --radius: 0.875rem;
 
   /* Luxury hospitality light workspace */
@@ -112,6 +113,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.18 0.015 50);
   --foreground: oklch(0.95 0.01 80);
   --card: oklch(0.22 0.018 50);

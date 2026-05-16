@@ -9,6 +9,7 @@ import {
   PartyPopper,
   Images,
   MessageSquare,
+  Route,
   BarChart3,
   Users,
   Settings,
@@ -45,6 +46,11 @@ const NAV: { section: string; items: Item[] }[] = [
     items: [
       { label: "Gallery", to: "/admin/gallery", icon: Images },
       { label: "Messages", to: "/admin/messages", icon: MessageSquare, badge: "3" },
+      {
+        label: "Marketing Page Routes",
+        to: "/admin/marketing-routes",
+        icon: Route,
+      },
     ],
   },
   {
@@ -135,8 +141,8 @@ export function AdminSidebar() {
                 className="flex flex-col leading-tight"
               >
                 <span className="font-display text-lg tracking-wide">Shivers</span>
-                <span className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/50">
-                  Luxury Suite
+                <span className="text-[11px] font-medium text-sidebar-foreground/70 mt-0.5">
+                  Admin Panel
                 </span>
               </motion.div>
             )}
@@ -155,11 +161,15 @@ export function AdminSidebar() {
               <TooltipContent side="right">Search</TooltipContent>
             </Tooltip>
           ) : (
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-sidebar-foreground/50" />
+            <div className="flex items-center gap-2.5 h-10 px-3 rounded-xl bg-sidebar-accent/40 border border-sidebar-border focus-within:ring-2 focus-within:ring-primary/40 transition-shadow">
+              <Search
+                className="size-4 shrink-0 text-sidebar-foreground/50 pointer-events-none"
+                aria-hidden
+              />
               <input
+                type="search"
                 placeholder="Search..."
-                className="w-full h-10 pl-9 pr-3 rounded-xl bg-sidebar-accent/40 border border-sidebar-border text-sm text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
+                className="flex-1 min-w-0 h-full bg-transparent border-0 p-0 text-sm text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus:outline-none focus:ring-0"
               />
             </div>
           )}

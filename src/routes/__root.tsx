@@ -9,6 +9,10 @@ import {
 } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
+import { AuthProvider } from "@/contexts/auth-context";
+import { ThemeProvider } from "@/contexts/theme-context";
+import { Toaster } from "@/components/ui/sonner";
+import { themeInitScript } from "@/lib/theme";
 
 function NotFoundComponent() {
   return (
@@ -96,8 +100,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <HeadContent />
       </head>
       <body>
@@ -113,7 +118,12 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <ThemeProvider>
+        <AuthProvider>
+          <Outlet />
+          <Toaster position="top-center" richColors closeButton />
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

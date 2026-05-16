@@ -18,6 +18,7 @@ import { Route as AdminRoomsRouteImport } from './routes/admin.rooms'
 import { Route as AdminRestaurantRouteImport } from './routes/admin.restaurant'
 import { Route as AdminReservationsRouteImport } from './routes/admin.reservations'
 import { Route as AdminMessagesRouteImport } from './routes/admin.messages'
+import { Route as AdminMarketingRoutesRouteImport } from './routes/admin.marketing-routes'
 import { Route as AdminGalleryRouteImport } from './routes/admin.gallery'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
@@ -68,6 +69,11 @@ const AdminMessagesRoute = AdminMessagesRouteImport.update({
   path: '/messages',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminMarketingRoutesRoute = AdminMarketingRoutesRouteImport.update({
+  id: '/marketing-routes',
+  path: '/marketing-routes',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminGalleryRoute = AdminGalleryRouteImport.update({
   id: '/gallery',
   path: '/gallery',
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/gallery': typeof AdminGalleryRoute
+  '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/reservations': typeof AdminReservationsRoute
   '/admin/restaurant': typeof AdminRestaurantRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/gallery': typeof AdminGalleryRoute
+  '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/reservations': typeof AdminReservationsRoute
   '/admin/restaurant': typeof AdminRestaurantRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/gallery': typeof AdminGalleryRoute
+  '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/reservations': typeof AdminReservationsRoute
   '/admin/restaurant': typeof AdminRestaurantRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/admin/bookings'
     | '/admin/events'
     | '/admin/gallery'
+    | '/admin/marketing-routes'
     | '/admin/messages'
     | '/admin/reservations'
     | '/admin/restaurant'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/admin/bookings'
     | '/admin/events'
     | '/admin/gallery'
+    | '/admin/marketing-routes'
     | '/admin/messages'
     | '/admin/reservations'
     | '/admin/restaurant'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/admin/bookings'
     | '/admin/events'
     | '/admin/gallery'
+    | '/admin/marketing-routes'
     | '/admin/messages'
     | '/admin/reservations'
     | '/admin/restaurant'
@@ -251,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMessagesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/marketing-routes': {
+      id: '/admin/marketing-routes'
+      path: '/marketing-routes'
+      fullPath: '/admin/marketing-routes'
+      preLoaderRoute: typeof AdminMarketingRoutesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/gallery': {
       id: '/admin/gallery'
       path: '/gallery'
@@ -287,6 +306,7 @@ interface AdminRouteChildren {
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminEventsRoute: typeof AdminEventsRoute
   AdminGalleryRoute: typeof AdminGalleryRoute
+  AdminMarketingRoutesRoute: typeof AdminMarketingRoutesRoute
   AdminMessagesRoute: typeof AdminMessagesRoute
   AdminReservationsRoute: typeof AdminReservationsRoute
   AdminRestaurantRoute: typeof AdminRestaurantRoute
@@ -301,6 +321,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBookingsRoute: AdminBookingsRoute,
   AdminEventsRoute: AdminEventsRoute,
   AdminGalleryRoute: AdminGalleryRoute,
+  AdminMarketingRoutesRoute: AdminMarketingRoutesRoute,
   AdminMessagesRoute: AdminMessagesRoute,
   AdminReservationsRoute: AdminReservationsRoute,
   AdminRestaurantRoute: AdminRestaurantRoute,
@@ -319,3 +340,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

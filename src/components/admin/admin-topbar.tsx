@@ -1,17 +1,17 @@
-import { useRouterState, Link } from "@tanstack/react-router";
+import { useRouterState, Link, useNavigate } from "@tanstack/react-router";
+import { useAuth } from "@/contexts/auth-context";
+import { AUTH_BYPASS } from "@/lib/auth";
 import { motion } from "framer-motion";
 import {
   Menu,
   Search,
   Bell,
   MessageSquare,
-  Download,
   ChevronDown,
-  Sun,
   ChevronRight,
 } from "lucide-react";
 import { useSidebarState } from "./sidebar-context";
-import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "./theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,15 +30,28 @@ const LABELS: Record<string, string> = {
   events: "Events",
   gallery: "Gallery",
   messages: "Messages",
+  "marketing-routes": "Marketing Page Routes",
   analytics: "Analytics",
   users: "Users",
   settings: "Settings",
 };
 
 export function AdminTopbar() {
+  const navigate = useNavigate();
+  const { session, logout } = useAuth();
   const { setMobileOpen } = useSidebarState();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const segments = pathname.split("/").filter(Boolean);
+
+  const initials = session?.name
+    ? session.name
+        .split(" ")
+        .map((p) => p[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "AM";
+  const displayName = session?.name ?? "Amelia M.";
 
   return (
     <header className="sticky top-0 z-30 h-16 px-4 md:px-8 flex items-center gap-3 border-b border-border glass">
@@ -75,22 +88,16 @@ export function AdminTopbar() {
       <div className="flex-1" />
 
       {/* Search */}
-      <div className="hidden lg:flex relative w-72">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+      <div className="hidden lg:flex items-center gap-2.5 w-72 h-10 px-3 rounded-xl bg-muted/60 border border-transparent focus-within:bg-card focus-within:border-border focus-within:ring-2 focus-within:ring-primary/30 transition-all">
+        <Search className="size-4 shrink-0 text-muted-foreground pointer-events-none" aria-hidden />
         <input
+          type="search"
           placeholder="Search anything..."
-          className="w-full h-10 pl-9 pr-3 rounded-xl bg-muted/60 border border-transparent text-sm placeholder:text-muted-foreground focus:outline-none focus:bg-card focus:border-border focus:ring-2 focus:ring-primary/30 transition-all"
+          className="flex-1 min-w-0 h-full bg-transparent border-0 p-0 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0"
         />
       </div>
 
-      <Button variant="outline" size="sm" className="hidden md:inline-flex gap-2 rounded-xl">
-        <Download className="size-4" />
-        Export
-      </Button>
-
-      <IconBtn>
-        <Sun className="size-[18px]" />
-      </IconBtn>
+      <ThemeToggle />
 
       <IconBtn badge>
         <MessageSquare className="size-[18px]" />
@@ -104,10 +111,10 @@ export function AdminTopbar() {
         <DropdownMenuTrigger asChild>
           <button className="flex items-center gap-2 pl-1 pr-2 h-10 rounded-xl hover:bg-accent transition-colors">
             <div className="size-8 rounded-full bg-gradient-gold flex items-center justify-center text-xs font-semibold text-coffee">
-              AM
+              {initials}
             </div>
             <div className="hidden md:flex flex-col text-left leading-tight">
-              <span className="text-sm font-medium">Amelia M.</span>
+              <span className="text-sm font-medium">{displayName}</span>
               <span className="text-[11px] text-muted-foreground">Manager</span>
             </div>
             <ChevronDown className="size-4 text-muted-foreground hidden md:block" />
@@ -120,7 +127,15 @@ export function AdminTopbar() {
           <DropdownMenuItem>Preferences</DropdownMenuItem>
           <DropdownMenuItem>Billing</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-destructive">Sign out</DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={() => {
+              if (!AUTH_BYPASS) logout();
+              navigate({ to: "/", replace: true });
+            }}
+          >
+            Sign out
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
