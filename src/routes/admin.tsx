@@ -1,10 +1,16 @@
-import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { SidebarProvider } from "@/components/admin/sidebar-context";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
+import { AUTH_BYPASS, getSession } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin")({
+  beforeLoad: async () => {
+    if (AUTH_BYPASS) return;
+    const session = await getSession();
+    if (!session) throw redirect({ to: "/" });
+  },
   component: AdminLayout,
 });
 

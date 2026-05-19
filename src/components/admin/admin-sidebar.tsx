@@ -17,6 +17,7 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
 import { useSidebarState } from "./sidebar-context";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -63,8 +64,18 @@ const NAV: { section: string; items: Item[] }[] = [
 ];
 
 export function AdminSidebar() {
+  const { session } = useAuth();
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarState();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const initials = session?.name
+    ? session.name
+        .split(" ")
+        .map((p) => p[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "?";
 
   const width = collapsed ? 88 : 280;
 
@@ -270,12 +281,14 @@ export function AdminSidebar() {
             )}
           >
             <div className="size-9 rounded-full bg-gradient-gold flex items-center justify-center text-sm font-semibold text-coffee shrink-0">
-              AM
+              {initials}
             </div>
             {!isCollapsed && (
               <div className="flex-1 min-w-0 leading-tight">
-                <div className="text-sm font-medium truncate">Amelia Marchetti</div>
-                <div className="text-[11px] text-sidebar-foreground/50 truncate">General Manager</div>
+                <div className="text-sm font-medium truncate">
+                  {session?.name ?? "Guest"}
+                </div>
+                <div className="text-[11px] text-sidebar-foreground/50 truncate">{session?.email ?? ""}</div>
               </div>
             )}
           </div>

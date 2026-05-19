@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/auth-context";
 
 export const Route = createFileRoute("/admin/")({
   component: DashboardPage,
@@ -73,6 +74,9 @@ const activity = [
 ];
 
 export default function DashboardPage() {
+  const { session } = useAuth();
+  const displayName = session?.name ?? "Guest";
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -82,7 +86,7 @@ export default function DashboardPage() {
             Thursday · May 14, 2026
           </p>
           <h1 className="font-display text-3xl md:text-4xl mt-1">
-            Welcome back, <span className="text-gradient-amber">Amelia</span>
+            Welcome back, <span className="text-gradient-amber">{displayName}</span>
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Here's what's unfolding across the estate today.
@@ -100,35 +104,32 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4">
         <KPICard
           label="Total Revenue"
-          value="$248,920"
-          delta="+12.4%"
-          deltaUp
+          value="—"
+          delta="—"
           icon={Wallet}
-          spark={[12, 18, 15, 22, 28, 24, 32, 38, 44]}
+          spark={[0, 0, 0, 0, 0, 0, 0, 0, 0]}
           accent
         />
         <KPICard
           label="Occupancy Rate"
-          value="86.4%"
-          delta="+4.8%"
-          deltaUp
+          value="—"
+          delta="—"
           icon={BedDouble}
-          spark={[40, 48, 52, 49, 60, 68, 72, 80, 86]}
+          spark={[0, 0, 0, 0, 0, 0, 0, 0, 0]}
         />
         <KPICard
           label="New Reservations"
-          value="1,284"
-          delta="+8.2%"
-          deltaUp
+          value="—"
+          delta="—"
           icon={CalendarCheck2}
-          spark={[20, 24, 22, 28, 30, 36, 32, 40, 44]}
+          spark={[0, 0, 0, 0, 0, 0, 0, 0, 0]}
         />
         <KPICard
           label="Avg. Guest Score"
-          value="4.92"
-          delta="-0.03"
+          value="—"
+          delta="—"
           icon={Star}
-          spark={[48, 50, 49, 52, 51, 50, 49, 48, 47]}
+          spark={[0, 0, 0, 0, 0, 0, 0, 0, 0]}
         />
       </div>
 
@@ -416,9 +417,8 @@ function KPICard({
       </div>
       <div className="flex items-end justify-between mt-4">
         <div className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${deltaUp ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-          {deltaUp ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
+          {delta !== "—" && (deltaUp ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />)}
           {delta}
-          <TrendingUp className="size-3 opacity-0" />
         </div>
         <div className="h-10 w-24 -mr-1">
           <ResponsiveContainer width="100%" height="100%">

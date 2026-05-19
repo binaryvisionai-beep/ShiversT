@@ -1,11 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PlaceholderPage } from "@/components/admin/placeholder-page";
+
+import { GalleryManager } from "@/components/admin/gallery/GalleryManager";
 
 export const Route = createFileRoute("/admin/gallery")({
-  component: () => (
-    <PlaceholderPage
-      title="Gallery"
-      description="Visual library powering the public site and brand campaigns."
-    />
-  ),
+  component: GalleryManager,
 });

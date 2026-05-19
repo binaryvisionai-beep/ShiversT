@@ -130,8 +130,10 @@ export function AdminTopbar() {
           <DropdownMenuItem
             className="text-destructive"
             onClick={() => {
-              if (!AUTH_BYPASS) logout();
-              navigate({ to: "/", replace: true });
+              void (async () => {
+                if (!AUTH_BYPASS) await logout();
+                navigate({ to: "/", replace: true });
+              })();
             }}
           >
             Sign out

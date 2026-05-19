@@ -1,6 +1,6 @@
-import { BLOCKED_SLOTS, MOCK_RESERVATIONS } from "./mock-reservations";
+import { BLOCKED_SLOTS } from "./blocked-slots";
 import { RESTAURANT_TABLES } from "./tables";
-import { TIME_SLOTS } from "./time-slots";
+import { parseReservationTimeTo24h, TIME_SLOTS } from "./time-slots";
 import type {
   Reservation,
   ReservationStatus,
@@ -12,20 +12,61 @@ import type {
 
 const ACTIVE_STATUSES: ReservationStatus[] = ["confirmed", "pending"];
 
-export function getReservationsForDate(date: string): Reservation[] {
-  return MOCK_RESERVATIONS.filter((r) => r.date === date);
+export type ReservationOverrides = {
+  patches: Record<string, Partial<Reservation>>;
+  removedIds: Set<string>;
+};
+
+function resolveReservations(
+  all: Reservation[],
+  overrides?: ReservationOverrides,
+): Reservation[] {
+  const patches = overrides?.patches ?? {};
+  const removed = overrides?.removedIds ?? new Set<string>();
+  return all
+    .filter((r) => !removed.has(r.id))
+    .map((r) => ({ ...r, ...patches[r.id] }));
+}
+
+export function getReservationById(
+  id: string,
+  all: Reservation[],
+  overrides?: ReservationOverrides,
+): Reservation | undefined {
+  return resolveReservations(all, overrides).find((r) => r.id === id);
+}
+
+export function getReservationsForDate(
+  date: string,
+  all: Reservation[],
+  overrides?: ReservationOverrides,
+): Reservation[] {
+  return resolveReservations(all, overrides).filter((r) => r.date === date);
+}
+
+export function getRecentReservations(
+  limit: number,
+  all: Reservation[],
+  overrides?: ReservationOverrides,
+): Reservation[] {
+  return resolveReservations(all, overrides)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit);
 }
 
 export function getReservationAtSlot(
   date: string,
   time: string,
   tableId: string,
+  all: Reservation[],
+  overrides?: ReservationOverrides,
 ): Reservation | undefined {
-  return MOCK_RESERVATIONS.find(
+  const slotTime = parseReservationTimeTo24h(time);
+  return resolveReservations(all, overrides).find(
     (r) =>
       r.date === date &&
-      r.time === time &&
-      r.tableId === tableId &&
+      parseReservationTimeTo24h(r.time) === slotTime &&
+      r.tableId.toLowerCase() === tableId.toLowerCase() &&
       ACTIVE_STATUSES.includes(r.status),
   );
 }
@@ -41,12 +82,14 @@ export function getTableDisplayStatus(
   date: string,
   time: string,
   guests: number,
+  all: Reservation[],
+  overrides?: ReservationOverrides,
 ): { displayStatus: TableDisplayStatus; reservation?: Reservation } {
   if (isTableBlocked(date, time, table.id)) {
     return { displayStatus: "unavailable" };
   }
 
-  const reservation = getReservationAtSlot(date, time, table.id);
+  const reservation = getReservationAtSlot(date, time, table.id, all, overrides);
   if (reservation) {
     return { displayStatus: "reserved", reservation };
   }
@@ -67,9 +110,19 @@ export function getTablesWithStatus(
   time: string,
   guests: number,
   zone: ZoneFilter,
+  tables: RestaurantTable[],
+  all: Reservation[],
+  overrides?: ReservationOverrides,
 ): TableWithStatus[] {
-  return RESTAURANT_TABLES.filter((t) => zone === "all" || t.zone === zone).map((table) => {
-    const { displayStatus, reservation } = getTableDisplayStatus(table, date, time, guests);
+  return tables.filter((t) => zone === "all" || t.zone === zone).map((table) => {
+    const { displayStatus, reservation } = getTableDisplayStatus(
+      table,
+      date,
+      time,
+      guests,
+      all,
+      overrides,
+    );
     return { ...table, displayStatus, reservation };
   });
 }
@@ -78,18 +131,32 @@ export function getSlotAvailability(
   date: string,
   time: string,
   guests: number,
+  tables: RestaurantTable[],
+  all: Reservation[],
+  overrides?: ReservationOverrides,
 ): { free: number; total: number } {
   let free = 0;
-  const total = RESTAURANT_TABLES.length;
-  for (const table of RESTAURANT_TABLES) {
-    const { displayStatus } = getTableDisplayStatus(table, date, time, guests);
+  const total = tables.length;
+  for (const table of tables) {
+    const { displayStatus } = getTableDisplayStatus(
+      table,
+      date,
+      time,
+      guests,
+      all,
+      overrides,
+    );
     if (displayStatus === "available" || displayStatus === "premium") free++;
   }
   return { free, total };
 }
 
-export function getDayStats(date: string) {
-  const dayReservations = getReservationsForDate(date).filter((r) =>
+export function getDayStats(
+  date: string,
+  all: Reservation[],
+  overrides?: ReservationOverrides,
+) {
+  const dayReservations = getReservationsForDate(date, all, overrides).filter((r) =>
     ACTIVE_STATUSES.includes(r.status),
   );
   const covers = dayReservations.reduce((s, r) => s + r.guests, 0);

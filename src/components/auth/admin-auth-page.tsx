@@ -57,7 +57,7 @@ export function AdminAuthPage() {
       navigate({ to: "/admin" });
       return;
     }
-    const result = login({ email: loginEmail, password: loginPassword });
+    const result = await login({ email: loginEmail, password: loginPassword });
     setSubmitting(false);
     if (result.ok) {
       toast.success("Welcome back", { description: `Signed in as ${result.session.name}` });
@@ -77,7 +77,7 @@ export function AdminAuthPage() {
       navigate({ to: "/admin" });
       return;
     }
-    const result = signup({
+    const result = await signup({
       name: signupName,
       email: signupEmail,
       password: signupPassword,

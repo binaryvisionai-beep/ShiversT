@@ -1,62 +1,15 @@
-/** Set to false when wiring real auth (login, signup, route guards). */
-export const AUTH_BYPASS = true;
+import type { AuthError } from "@supabase/supabase-js";
 
-export type AdminUser = {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-};
+import { supabase } from "@/lib/supabase";
+
+/** Set to false when wiring real auth (login, signup, route guards). */
+export const AUTH_BYPASS = false;
 
 export type AdminSession = {
   userId: string;
   name: string;
   email: string;
 };
-
-const USERS_KEY = "amber_admin_users";
-const SESSION_KEY = "amber_admin_session";
-
-function isBrowser() {
-  return typeof window !== "undefined";
-}
-
-function readUsers(): AdminUser[] {
-  if (!isBrowser()) return [];
-  try {
-    const raw = localStorage.getItem(USERS_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as AdminUser[];
-  } catch {
-    return [];
-  }
-}
-
-function writeUsers(users: AdminUser[]) {
-  if (!isBrowser()) return;
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-export function getSession(): AdminSession | null {
-  if (!isBrowser()) return null;
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as AdminSession;
-  } catch {
-    return null;
-  }
-}
-
-export function setSession(session: AdminSession) {
-  if (!isBrowser()) return;
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-}
-
-export function clearSession() {
-  if (!isBrowser()) return;
-  localStorage.removeItem(SESSION_KEY);
-}
 
 export type SignupInput = {
   name: string;
@@ -73,7 +26,68 @@ export type AuthResult =
   | { ok: true; session: AdminSession }
   | { ok: false; error: string };
 
-export function signup(input: SignupInput): AuthResult {
+type AdminAuthRow = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+function isBrowser() {
+  return typeof window !== "undefined";
+}
+
+function mapAuthError(error: AuthError | null): string {
+  if (!error) return "Something went wrong. Please try again.";
+
+  const msg = error.message.toLowerCase();
+
+  if (msg.includes("invalid login credentials")) {
+    return "Invalid email or password.";
+  }
+  if (msg.includes("user already registered")) {
+    return "An account with this email already exists.";
+  }
+  if (msg.includes("email not confirmed")) {
+    return "Please confirm your email before signing in.";
+  }
+  if (msg.includes("password")) {
+    return error.message;
+  }
+
+  return error.message;
+}
+
+function toSession(row: AdminAuthRow): AdminSession {
+  return {
+    userId: row.id,
+    name: row.name,
+    email: row.email,
+  };
+}
+
+async function fetchAdminProfile(userId: string): Promise<AdminSession | null> {
+  const { data, error } = await supabase
+    .from("adminauth")
+    .select("id, name, email")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return toSession(data as AdminAuthRow);
+}
+
+export async function getSession(): Promise<AdminSession | null> {
+  if (!isBrowser()) return null;
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.user) return null;
+  return fetchAdminProfile(session.user.id);
+}
+
+export async function signup(input: SignupInput): Promise<AuthResult> {
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
   const password = input.password;
@@ -86,50 +100,82 @@ export function signup(input: SignupInput): AuthResult {
     return { ok: false, error: "Password must be at least 8 characters." };
   }
 
-  const users = readUsers();
-  if (users.some((u) => u.email === email)) {
-    return { ok: false, error: "An account with this email already exists." };
-  }
-
-  const user: AdminUser = {
-    id: crypto.randomUUID(),
-    name,
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
-  };
+    options: { data: { name } },
+  });
 
-  writeUsers([...users, user]);
+  if (error) return { ok: false, error: mapAuthError(error) };
+  if (!data.user) {
+    return { ok: false, error: "Could not create account. Please try again." };
+  }
 
-  const session: AdminSession = {
-    userId: user.id,
-    name: user.name,
-    email: user.email,
-  };
-  setSession(session);
+  if (!data.session) {
+    return {
+      ok: false,
+      error: "Account created. Please check your email to confirm before signing in.",
+    };
+  }
+
+  const session = await fetchAdminProfile(data.user.id);
+  if (!session) {
+    const { error: profileError } = await supabase.from("adminauth").insert({
+      id: data.user.id,
+      name,
+      email,
+    });
+
+    if (profileError) {
+      return { ok: false, error: "Could not create admin profile. Please try again." };
+    }
+
+    await supabase.from("adminsignup").insert({
+      admin_id: data.user.id,
+      email,
+    });
+
+    const retry = await fetchAdminProfile(data.user.id);
+    if (!retry) {
+      return { ok: false, error: "Account created but profile could not be loaded." };
+    }
+    return { ok: true, session: retry };
+  }
+
   return { ok: true, session };
 }
 
-export function login(input: LoginInput): AuthResult {
+export async function login(input: LoginInput): Promise<AuthResult> {
   const email = input.email.trim().toLowerCase();
   const password = input.password;
 
   if (!email) return { ok: false, error: "Please enter your email." };
   if (!password) return { ok: false, error: "Please enter your password." };
 
-  const user = readUsers().find((u) => u.email === email);
-  if (!user || user.password !== password) {
-    return { ok: false, error: "Invalid email or password." };
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.user) {
+    return { ok: false, error: mapAuthError(error) };
   }
 
-  const session: AdminSession = {
-    userId: user.id,
-    name: user.name,
-    email: user.email,
-  };
-  setSession(session);
+  const session = await fetchAdminProfile(data.user.id);
+  if (!session) {
+    await supabase.auth.signOut();
+    return { ok: false, error: "Not an admin account." };
+  }
+
+  await supabase.from("adminlogin").insert({
+    admin_id: session.userId,
+    email: session.email,
+  });
+
   return { ok: true, session };
 }
 
-export function logout() {
-  clearSession();
+export async function logout(): Promise<void> {
+  if (!isBrowser()) return;
+  await supabase.auth.signOut();
 }

@@ -1,9 +1,9 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { Globe, Mail, MapPin, Phone, Sparkles, User } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { Globe, Mail, MapPin, Phone, User } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RESTAURANT_TABLES, VENUE_NAME, ZONE_LABELS } from "@/lib/reservations/tables";
+import { VENUE_NAME, ZONE_LABELS } from "@/lib/reservations/tables";
 import { formatTimeSlot } from "@/lib/reservations/time-slots";
 import type { Reservation, RestaurantTable } from "@/lib/reservations/types";
 import { cn } from "@/lib/utils";
@@ -47,121 +47,95 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 export function ReservationDetailPanel({
   reservation,
-  table,
-  date,
-  time,
-  guests,
+  allTables,
+  onApprove,
+  onDelete,
+  isUpdating = false,
 }: {
-  reservation: Reservation | null;
-  table: RestaurantTable | null;
-  date: string;
-  time: string;
-  guests: number;
+  reservation: Reservation;
+  allTables: RestaurantTable[];
+  onApprove: () => void;
+  onDelete: () => void;
+  isUpdating?: boolean;
 }) {
-  const tableMeta = table ?? (reservation ? RESTAURANT_TABLES.find((t) => t.id === reservation.tableId) : null);
+  const tableMeta = allTables.find(
+    (t) => t.id.toLowerCase() === reservation.tableId.toLowerCase(),
+  );
+  const canApprove = reservation.status === "pending" && !isUpdating;
+  const canDelete = reservation.status !== "cancelled" && !isUpdating;
+  const tableDisplay = tableMeta
+    ? `${tableMeta.name} (${ZONE_LABELS[tableMeta.zone]}) · ${tableMeta.seats} seats`
+    : reservation.tableLabel
+      ? `${reservation.tableLabel}${reservation.tableZone ? ` (${reservation.tableZone})` : ""}`
+      : reservation.tableId;
 
   return (
-    <motion.div className="rounded-2xl border border-border bg-card shadow-soft h-full flex flex-col overflow-hidden">
-      <motion.div className="p-5 border-b border-border bg-muted/30">
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Reservation details</p>
-        <h3 className="font-display text-xl mt-1">Guest summary</h3>
-      </motion.div>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap gap-2">
+        <StatusBadge status={reservation.status} />
+        <SourceBadge source={reservation.source} />
+        {(tableMeta?.premium || reservation.isPremiumTable) && (
+          <Badge className="rounded-full bg-gradient-gold text-coffee border-0">Premium</Badge>
+        )}
+      </div>
 
-      <motion.div className="flex-1 overflow-y-auto p-5 scrollbar-thin">
-        <AnimatePresence mode="wait">
-          {reservation ? (
-            <motion.div
-              key={reservation.id}
-              initial={{ opacity: 0, x: 12 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.25 }}
-              className="space-y-5"
-            >
-              <motion.div className="flex flex-wrap gap-2">
-                <StatusBadge status={reservation.status} />
-                <SourceBadge source={reservation.source} />
-                {tableMeta?.premium && (
-                  <Badge className="rounded-full bg-gradient-gold text-coffee border-0">Premium</Badge>
-                )}
-              </motion.div>
+      <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
+        <DetailRow label="Date" value={reservation.date} />
+        <DetailRow label="Time" value={formatTimeSlot(reservation.time)} />
+        <DetailRow label="Guests" value={String(reservation.guests)} />
+        <DetailRow label="Table" value={tableDisplay} />
+        <DetailRow
+          label="Booked"
+          value={formatDistanceToNow(new Date(reservation.createdAt), { addSuffix: true })}
+        />
+      </div>
 
-              <motion.div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
-                <DetailRow label="Date" value={reservation.date} />
-                <DetailRow label="Time" value={formatTimeSlot(reservation.time)} />
-                <DetailRow label="Guests" value={String(reservation.guests)} />
-                <DetailRow
-                  label="Table"
-                  value={
-                    tableMeta
-                      ? `${tableMeta.name} (${ZONE_LABELS[tableMeta.zone]})`
-                      : reservation.tableId
-                  }
-                />
-              </motion.div>
+      <div className="space-y-3">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">Guest</p>
+        <div className="flex items-center gap-2 text-sm">
+          <User className="size-4 text-muted-foreground shrink-0" />
+          <span className="font-medium">{reservation.guestName}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <Phone className="size-4 text-muted-foreground shrink-0" />
+          <span>{reservation.phone}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <Mail className="size-4 text-muted-foreground shrink-0" />
+          <span className="truncate">{reservation.email ?? "—"}</span>
+        </div>
+      </div>
 
-              <motion.div className="space-y-3">
-                <motion.div className="flex items-center gap-2 text-sm">
-                  <User className="size-4 text-muted-foreground" />
-                  <span className="font-medium">{reservation.guestName}</span>
-                </motion.div>
-                <motion.div className="flex items-center gap-2 text-sm">
-                  <Phone className="size-4 text-muted-foreground" />
-                  <span>{reservation.phone}</span>
-                </motion.div>
-                {reservation.email && (
-                  <motion.div className="flex items-center gap-2 text-sm">
-                    <Mail className="size-4 text-muted-foreground" />
-                    <span className="truncate">{reservation.email}</span>
-                  </motion.div>
-                )}
-              </motion.div>
+      <div className="rounded-xl border border-border p-3 text-sm">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
+          Special requests
+        </p>
+        <p className="text-foreground/90">{reservation.notes?.trim() ? reservation.notes : "—"}</p>
+      </div>
 
-              {reservation.notes && (
-                <motion.div className="rounded-xl border border-border p-3 text-sm">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-                    Special requests
-                  </p>
-                  <p className="text-foreground/90">{reservation.notes}</p>
-                </motion.div>
-              )}
+      <p className="text-xs text-muted-foreground flex items-center gap-1">
+        <MapPin className="size-3 shrink-0" /> {VENUE_NAME}
+      </p>
 
-              <motion.div className="flex gap-2 pt-2">
-                <Button className="flex-1 rounded-xl bg-gradient-amber border-0 text-primary-foreground shadow-glow hover:opacity-95">
-                  Confirm
-                </Button>
-                <Button variant="outline" className="rounded-xl">
-                  Cancel
-                </Button>
-              </motion.div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center text-center py-10 px-4"
-            >
-              <motion.div className="size-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-                <Sparkles className="size-6 text-muted-foreground" />
-              </motion.div>
-              <p className="font-display text-lg">No reservation selected</p>
-              <p className="text-sm text-muted-foreground mt-2 max-w-[220px]">
-                Select a booked table or a row in the list to view guest details from the website.
-              </p>
-              <motion.div className="mt-6 w-full rounded-xl border border-dashed border-border p-4 space-y-2 text-left text-sm">
-                <DetailRow label="Date" value={date} />
-                <DetailRow label="Time" value={time ? formatTimeSlot(time) : "—"} />
-                <DetailRow label="Guests" value={String(guests)} />
-                <DetailRow label="Table" value={tableMeta?.name ?? "—"} />
-              </motion.div>
-              <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1 justify-center">
-                <MapPin className="size-3" /> {VENUE_NAME}
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </motion.div>
+      <div className="flex flex-col gap-2 pt-2 sm:flex-row">
+        <Button
+          type="button"
+          disabled={!canApprove}
+          onClick={onApprove}
+          className="flex-1 rounded-xl bg-gradient-amber border-0 text-primary-foreground shadow-glow hover:opacity-95 disabled:opacity-50"
+        >
+          Approve
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!canDelete}
+          onClick={onDelete}
+          className="flex-1 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+        >
+          Delete
+        </Button>
+      </div>
+    </div>
   );
 }

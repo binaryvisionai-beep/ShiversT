@@ -17,13 +17,14 @@ import {
   type LoginInput,
   type SignupInput,
 } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 type AuthContextValue = {
   session: AdminSession | null;
   isLoading: boolean;
   login: (input: LoginInput) => ReturnType<typeof authLogin>;
   signup: (input: SignupInput) => ReturnType<typeof authSignup>;
-  logout: () => void;
+  logout: () => ReturnType<typeof authLogout>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -33,24 +34,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setSession(getSession());
-    setIsLoading(false);
+    let mounted = true;
+
+    const loadSession = async () => {
+      const current = await getSession();
+      if (mounted) setSession(current);
+      if (mounted) setIsLoading(false);
+    };
+
+    void loadSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void (async () => {
+        const current = await getSession();
+        if (mounted) setSession(current);
+        if (mounted) setIsLoading(false);
+      })();
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const login = useCallback((input: LoginInput) => {
-    const result = authLogin(input);
+  const login = useCallback(async (input: LoginInput) => {
+    const result = await authLogin(input);
     if (result.ok) setSession(result.session);
     return result;
   }, []);
 
-  const signup = useCallback((input: SignupInput) => {
-    const result = authSignup(input);
+  const signup = useCallback(async (input: SignupInput) => {
+    const result = await authSignup(input);
     if (result.ok) setSession(result.session);
     return result;
   }, []);
 
-  const logout = useCallback(() => {
-    authLogout();
+  const logout = useCallback(async () => {
+    await authLogout();
     setSession(null);
   }, []);
 
