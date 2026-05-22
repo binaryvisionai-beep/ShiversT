@@ -13,16 +13,19 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminTiffinboxRouteImport } from './routes/admin.tiffinbox'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminRoomsRouteImport } from './routes/admin.rooms'
 import { Route as AdminRestaurantRouteImport } from './routes/admin.restaurant'
 import { Route as AdminReservationsRouteImport } from './routes/admin.reservations'
 import { Route as AdminMessagesRouteImport } from './routes/admin.messages'
 import { Route as AdminMarketingRoutesRouteImport } from './routes/admin.marketing-routes'
+import { Route as AdminHomepageRouteImport } from './routes/admin.homepage'
 import { Route as AdminGalleryRouteImport } from './routes/admin.gallery'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
+import { Route as AdminAboutRouteImport } from './routes/admin.about'
 
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
@@ -42,6 +45,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTiffinboxRoute = AdminTiffinboxRouteImport.update({
+  id: '/tiffinbox',
+  path: '/tiffinbox',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
@@ -74,6 +82,11 @@ const AdminMarketingRoutesRoute = AdminMarketingRoutesRouteImport.update({
   path: '/marketing-routes',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminHomepageRoute = AdminHomepageRouteImport.update({
+  id: '/homepage',
+  path: '/homepage',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminGalleryRoute = AdminGalleryRouteImport.update({
   id: '/gallery',
   path: '/gallery',
@@ -94,35 +107,46 @@ const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAboutRoute = AdminAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/admin/about': typeof AdminAboutRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/gallery': typeof AdminGalleryRoute
+  '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/reservations': typeof AdminReservationsRoute
   '/admin/restaurant': typeof AdminRestaurantRoute
   '/admin/rooms': typeof AdminRoomsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/tiffinbox': typeof AdminTiffinboxRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/about': typeof AdminAboutRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/gallery': typeof AdminGalleryRoute
+  '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/reservations': typeof AdminReservationsRoute
   '/admin/restaurant': typeof AdminRestaurantRoute
   '/admin/rooms': typeof AdminRoomsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/tiffinbox': typeof AdminTiffinboxRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin': typeof AdminIndexRoute
 }
@@ -130,16 +154,19 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/admin/about': typeof AdminAboutRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/gallery': typeof AdminGalleryRoute
+  '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/reservations': typeof AdminReservationsRoute
   '/admin/restaurant': typeof AdminRestaurantRoute
   '/admin/rooms': typeof AdminRoomsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/tiffinbox': typeof AdminTiffinboxRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
 }
@@ -148,47 +175,56 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/admin/about'
     | '/admin/analytics'
     | '/admin/bookings'
     | '/admin/events'
     | '/admin/gallery'
+    | '/admin/homepage'
     | '/admin/marketing-routes'
     | '/admin/messages'
     | '/admin/reservations'
     | '/admin/restaurant'
     | '/admin/rooms'
     | '/admin/settings'
+    | '/admin/tiffinbox'
     | '/admin/users'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin/about'
     | '/admin/analytics'
     | '/admin/bookings'
     | '/admin/events'
     | '/admin/gallery'
+    | '/admin/homepage'
     | '/admin/marketing-routes'
     | '/admin/messages'
     | '/admin/reservations'
     | '/admin/restaurant'
     | '/admin/rooms'
     | '/admin/settings'
+    | '/admin/tiffinbox'
     | '/admin/users'
     | '/admin'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/admin/about'
     | '/admin/analytics'
     | '/admin/bookings'
     | '/admin/events'
     | '/admin/gallery'
+    | '/admin/homepage'
     | '/admin/marketing-routes'
     | '/admin/messages'
     | '/admin/reservations'
     | '/admin/restaurant'
     | '/admin/rooms'
     | '/admin/settings'
+    | '/admin/tiffinbox'
     | '/admin/users'
     | '/admin/'
   fileRoutesById: FileRoutesById
@@ -226,6 +262,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/tiffinbox': {
+      id: '/admin/tiffinbox'
+      path: '/tiffinbox'
+      fullPath: '/admin/tiffinbox'
+      preLoaderRoute: typeof AdminTiffinboxRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/settings': {
@@ -270,6 +313,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMarketingRoutesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/homepage': {
+      id: '/admin/homepage'
+      path: '/homepage'
+      fullPath: '/admin/homepage'
+      preLoaderRoute: typeof AdminHomepageRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/gallery': {
       id: '/admin/gallery'
       path: '/gallery'
@@ -298,35 +348,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAnalyticsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/about': {
+      id: '/admin/about'
+      path: '/about'
+      fullPath: '/admin/about'
+      preLoaderRoute: typeof AdminAboutRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminAboutRoute: typeof AdminAboutRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminEventsRoute: typeof AdminEventsRoute
   AdminGalleryRoute: typeof AdminGalleryRoute
+  AdminHomepageRoute: typeof AdminHomepageRoute
   AdminMarketingRoutesRoute: typeof AdminMarketingRoutesRoute
   AdminMessagesRoute: typeof AdminMessagesRoute
   AdminReservationsRoute: typeof AdminReservationsRoute
   AdminRestaurantRoute: typeof AdminRestaurantRoute
   AdminRoomsRoute: typeof AdminRoomsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminTiffinboxRoute: typeof AdminTiffinboxRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAboutRoute: AdminAboutRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminBookingsRoute: AdminBookingsRoute,
   AdminEventsRoute: AdminEventsRoute,
   AdminGalleryRoute: AdminGalleryRoute,
+  AdminHomepageRoute: AdminHomepageRoute,
   AdminMarketingRoutesRoute: AdminMarketingRoutesRoute,
   AdminMessagesRoute: AdminMessagesRoute,
   AdminReservationsRoute: AdminReservationsRoute,
   AdminRestaurantRoute: AdminRestaurantRoute,
   AdminRoomsRoute: AdminRoomsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
+  AdminTiffinboxRoute: AdminTiffinboxRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

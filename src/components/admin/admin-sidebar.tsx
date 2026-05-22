@@ -24,6 +24,46 @@ import { cn } from "@/lib/utils";
 
 type Item = { label: string; to: string; icon: React.ComponentType<{ className?: string }>; badge?: string };
 
+// const NAV: { section: string; items: Item[] }[] = [
+//   {
+//     section: "Overview",
+//     items: [
+//       { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
+//       { label: "Analytics", to: "/admin/analytics", icon: BarChart3 },
+//     ],
+//   },
+//   {
+//     section: "Hospitality",
+//     items: [
+//       { label: "Bookings", to: "/admin/bookings", icon: CalendarCheck, badge: "12" },
+//       { label: "Reservations", to: "/admin/reservations", icon: BookMarked },
+//       { label: "Rooms", to: "/admin/rooms", icon: BedDouble },
+//       { label: "Restaurant", to: "/admin/restaurant", icon: UtensilsCrossed },
+//       { label: "Events", to: "/admin/events", icon: PartyPopper },
+//     ],
+//   },
+//   {
+//     section: "Content",
+//     items: [
+//       { label: "Gallery", to: "/admin/gallery", icon: Images },
+//       { label: "Messages", to: "/admin/messages", icon: MessageSquare, badge: "3" },
+//       {
+//         label: "Marketing Page Routes",
+//         to: "/admin/marketing-routes",
+//         icon: Route,
+//       },
+//     ],
+//   },
+//   {
+//     section: "System",
+//     items: [
+//       { label: "Users", to: "/admin/users", icon: Users },
+//       { label: "Settings", to: "/admin/settings", icon: Settings },
+//     ],
+//   },
+// ];
+
+
 const NAV: { section: string; items: Item[] }[] = [
   {
     section: "Overview",
@@ -32,6 +72,14 @@ const NAV: { section: string; items: Item[] }[] = [
       { label: "Analytics", to: "/admin/analytics", icon: BarChart3 },
     ],
   },
+
+  {
+    section: "Homepage CMS",
+    items: [
+      { label: "Homepage", to: "/admin/homepage", icon: LayoutDashboard },
+    ],
+  },
+
   {
     section: "Hospitality",
     items: [
@@ -39,9 +87,12 @@ const NAV: { section: string; items: Item[] }[] = [
       { label: "Reservations", to: "/admin/reservations", icon: BookMarked },
       { label: "Rooms", to: "/admin/rooms", icon: BedDouble },
       { label: "Restaurant", to: "/admin/restaurant", icon: UtensilsCrossed },
+      { label: "Tiffin Box", to: "/admin/tiffinbox", icon: UtensilsCrossed },
       { label: "Events", to: "/admin/events", icon: PartyPopper },
+      
     ],
   },
+
   {
     section: "Content",
     items: [
@@ -54,6 +105,7 @@ const NAV: { section: string; items: Item[] }[] = [
       },
     ],
   },
+
   {
     section: "System",
     items: [
@@ -62,6 +114,7 @@ const NAV: { section: string; items: Item[] }[] = [
     ],
   },
 ];
+
 
 export function AdminSidebar() {
   const { session } = useAuth();
