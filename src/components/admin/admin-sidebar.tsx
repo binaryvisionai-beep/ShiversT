@@ -77,6 +77,8 @@ const NAV: { section: string; items: Item[] }[] = [
     section: "Homepage CMS",
     items: [
       { label: "Homepage", to: "/admin/homepage", icon: LayoutDashboard },
+      { label: "About", to: "/admin/about", icon: Users },
+
     ],
   },
 
