@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect , useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
-import { Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Pencil, Save, Trash2 , Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyGalleryState } from "@/components/admin/gallery/EmptyGalleryState";
@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/auth-context";
@@ -40,8 +42,12 @@ import { useGalleryReorder } from "@/hooks/useGalleryReorder";
 import { useGalleryUpload } from "@/hooks/useGalleryUpload";
 import { pageVariants } from "@/lib/animations/gallery";
 import { deleteGalleryImage, updateGalleryImage } from "@/lib/supabase/gallery";
+import { supabase } from "@/lib/supabase";
 import type { GalleryFilter, GalleryImage, GallerySort } from "@/types/gallery";
 import { cn } from "@/lib/utils";
+
+
+
 
 type ViewMode = "grid" | "compact";
 
@@ -58,12 +64,111 @@ export function GalleryManager() {
   const [deleteTarget, setDeleteTarget] = useState<GalleryImage | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
+  // Dynamic categories from DB (for upload modal + filter toolbar)
+  const [dbCategories, setDbCategories] = useState<string[]>(["food", "ambiance"]);
+
+  // Hero image state
+  const [heroUrl, setHeroUrl] = useState("");
+  const [heroId, setHeroId] = useState<string | null>(null);
+  const [savingHero, setSavingHero] = useState(false);
+  const [showHeroEditor, setShowHeroEditor] = useState(false);
+  const heroInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Fetch unique categories from DB
+    supabase
+      .from("gallery_images")
+      .select("category")
+      .then(({ data }) => {
+        if (data) {
+          const unique = Array.from(new Set(data.map((r: any) => r.category as string))).filter(Boolean);
+          if (unique.length > 0) setDbCategories(unique);
+        }
+      });
+
+    // Fetch hero
+    supabase
+      .from("gallery_hero")
+      .select("*")
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) { setHeroUrl(data.image_url); setHeroId(data.id); }
+      });
+  }, []);
+
+  // const saveHero = async () => {
+  //   if (!heroUrl.trim()) return;
+  //   setSavingHero(true);
+  //   if (heroId) {
+  //     const { error } = await supabase.from("gallery_hero").update({ image_url: heroUrl.trim() }).eq("id", heroId);
+  //     if (error) { toast.error("Failed to save hero image"); setSavingHero(false); return; }
+  //   } else {
+  //     const { data, error } = await supabase.from("gallery_hero").insert([{ image_url: heroUrl.trim() }]).select().single();
+  //     if (error) { toast.error("Failed to save hero image"); setSavingHero(false); return; }
+  //     if (data) setHeroId(data.id);
+  //   }
+  //   setSavingHero(false);
+  //   toast.success("Hero image saved");
+  // };
+
+
+
+  const handleHeroFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSavingHero(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `hero/gallery-hero-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("gallery")
+        .upload(path, file, { upsert: true });
+      // if (uploadError) { toast.error("Upload failed"); setSavingHero(false); return; }
+      if (uploadError) {
+        console.error(uploadError);
+        toast.error(uploadError.message);
+        setSavingHero(false);
+        return;
+      }
+      
+      const { data: urlData } = supabase.storage.from("gallery").getPublicUrl(path);
+      const publicUrl = urlData.publicUrl;
+  
+      if (heroId) {
+        await supabase.from("gallery_hero").update({ image_url: publicUrl }).eq("id", heroId);
+      } else {
+        const { data } = await supabase.from("gallery_hero").insert([{ image_url: publicUrl }]).select().single();
+        if (data) setHeroId(data.id);
+      }
+      setHeroUrl(publicUrl);
+      toast.success("Hero image updated");
+    } catch {
+      toast.error("Something went wrong");
+    } finally {
+      setSavingHero(false);
+      e.target.value = "";
+    }
+  };
+
+
+
+
+
   const { images, stats, isLoading, isError, invalidate } = useGallery({
     category: category === "all" ? undefined : category,
     search,
     sort,
     includeHidden: true,
   });
+
+  // Keep dbCategories in sync after new uploads
+  useEffect(() => {
+    const cats = Array.from(new Set(images.map((i) => i.category))).filter(Boolean);
+    if (cats.length > 0) {
+      setDbCategories((prev) => Array.from(new Set([...prev, ...cats])));
+    }
+  }, [images]);
 
   const filteredImages = useMemo(() => {
     if (showHidden) return images;
@@ -76,11 +181,7 @@ export function GalleryManager() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteGalleryImage,
-    onSuccess: () => {
-      invalidate();
-      toast.success("Image removed");
-      setDeleteTarget(null);
-    },
+    onSuccess: () => { invalidate(); toast.success("Image removed"); setDeleteTarget(null); },
     onError: () => toast.error("Could not delete image"),
   });
 
@@ -107,10 +208,7 @@ export function GalleryManager() {
 
   const handleBulkDelete = () => {
     bulk.bulkDelete.mutate(selectedImages, {
-      onSuccess: () => {
-        setSelectedIds(new Set());
-        setBulkDeleteOpen(false);
-      },
+      onSuccess: () => { setSelectedIds(new Set()); setBulkDeleteOpen(false); },
     });
   };
 
@@ -119,25 +217,82 @@ export function GalleryManager() {
       <header className="space-y-3">
         <Breadcrumb>
           <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/admin">Admin</BreadcrumbLink>
-            </BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbLink href="/admin">Admin</BreadcrumbLink></BreadcrumbItem>
             <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Gallery</BreadcrumbPage>
-            </BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbPage>Gallery</BreadcrumbPage></BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
         <motion.div layout>
           <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Content</p>
           <h1 className="font-display text-3xl md:text-4xl mt-1">Gallery</h1>
           <p className="text-muted-foreground mt-1 text-sm max-w-xl">
-            Curate cinematic visuals for the public site — Food, Ambiance, and display order.
+            Curate visuals for the public site. Images render at their natural size — like an Instagram feed.
           </p>
         </motion.div>
       </header>
 
       <GalleryStats stats={stats} />
+
+      {/* ── Hero image editor ── */}
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Hero Image</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Shown at the top of the public Gallery page.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => setShowHeroEditor((v) => !v)}
+          >
+            {showHeroEditor ? "Hide" : "Edit"}
+          </Button>
+        </div>
+        {showHeroEditor && (
+          <div className="space-y-3 pt-1">
+            {heroUrl && (
+              <div className="rounded-xl overflow-hidden aspect-[16/5] bg-muted">
+                <img src={heroUrl} alt="Current hero" className="h-full w-full object-cover" />
+              </div>
+            )}
+            {/* <div className="flex gap-2">
+              <Input
+                className="rounded-xl flex-1"
+                placeholder="Paste Supabase Storage public URL"
+                value={heroUrl}
+                onChange={(e) => setHeroUrl(e.target.value)}
+              />
+              <Button
+                className="rounded-xl bg-gradient-amber border-0 text-primary-foreground shrink-0"
+                disabled={savingHero || !heroUrl.trim()}
+                onClick={saveHero}
+              >
+                {savingHero ? "Saving…" : <><Save className="size-4 mr-1" /> Save</>}
+              </Button>
+            </div> */}
+          <div className="flex gap-2">
+  <input
+    ref={heroInputRef}
+    type="file"
+    accept="image/*"
+    className="hidden"
+    onChange={handleHeroFileUpload}
+  />
+  <Button
+    className="rounded-xl bg-gradient-amber border-0 text-primary-foreground"
+    disabled={savingHero}
+    onClick={() => heroInputRef.current?.click()}
+  >
+    {savingHero ? "Uploading…" : <><Upload className="size-4 mr-1" /> Upload Image</>}
+  </Button>
+</div>
+          
+          </div>
+        )}
+      </div>
 
       <GalleryToolbar
         search={search}
@@ -250,12 +405,7 @@ export function GalleryManager() {
                     onCheckedChange={(v) => visibilityMutation.mutate({ image, visible: v })}
                     aria-label="Toggle visibility"
                   />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-8"
-                    onClick={() => setEditImage(image)}
-                  >
+                  <Button size="icon" variant="ghost" className="size-8" onClick={() => setEditImage(image)}>
                     <Pencil className="size-3.5" />
                   </Button>
                   <Button
@@ -273,7 +423,13 @@ export function GalleryManager() {
         </div>
       )}
 
-      <GalleryUploadModal open={uploadOpen} onOpenChange={setUploadOpen} onUpload={uploadOne} />
+      {/* Upload modal — pass dynamic categories */}
+      <GalleryUploadModal
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        onUpload={(file, cat) => uploadOne(file, cat as any)}
+        existingCategories={dbCategories}
+      />
 
       <GalleryEditDrawer
         image={editImage}

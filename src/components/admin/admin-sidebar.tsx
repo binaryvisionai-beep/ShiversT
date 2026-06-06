@@ -20,6 +20,7 @@ import {
   Search,
   Sparkles,
   MessageCircle,
+  Phone,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useSidebarState } from "./sidebar-context";
@@ -73,7 +74,7 @@ const NAV: { section: string; items: Item[] }[] = [
     section: "Overview",
     items: [
       { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
-      { label: "Analytics", to: "/admin/analytics", icon: BarChart3 },
+      // { label: "Analytics", to: "/admin/analytics", icon: BarChart3 },
     ],
   },
 
@@ -89,8 +90,8 @@ const NAV: { section: string; items: Item[] }[] = [
   {
     section: "Bookings",
     items: [
-      { label: "ALL", to: "/admin/bookings", icon: CalendarCheck, badge: "12" },
-      { label: "Room Bookings", to: "/admin/room-bookings", icon: Hotel },
+      // { label: "ALL", to: "/admin/bookings", icon: CalendarCheck, badge: "12" },
+      // { label: "Room Bookings", to: "/admin/room-bookings", icon: Hotel },
       { label: "Restaurant", to: "/admin/restaurant", icon: UtensilsCrossed },
       { label: "Events", to: "/admin/events", icon: PartyPopper },
     ],
@@ -111,13 +112,15 @@ const NAV: { section: string; items: Item[] }[] = [
     items: [
       { label: "Gallery", to: "/admin/gallery", icon: Images },
       { label: "Reviews", to: "/admin/reviews", icon: Star },
-      { label: "Messages", to: "/admin/messages", icon: MessageSquare, badge: "3" },
-      {
-        label: "Marketing Page Routes",
-        to: "/admin/marketing-routes",
-        icon: Route,
-      },
+      // { label: "Messages", to: "/admin/messages", icon: MessageSquare, badge: "3" },
+      // {
+      //   label: "Marketing Page Routes",
+      //   to: "/admin/marketing-routes",
+      //   icon: Route,
+      // },
+      { label: "Careers",                to: "/admin/careers",           icon: Users          },
       { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
+      { label: "Contacts", to: "/admin/contacts", icon: Phone },
     ],
   },
 
@@ -126,7 +129,7 @@ const NAV: { section: string; items: Item[] }[] = [
     items: [
       { label: "Users", to: "/admin/users", icon: Users },
       { label: "Notification", to: "/admin/notifications", icon: Bell },
-      { label: "Settings", to: "/admin/settings", icon: Settings },
+      // { label: "Settings", to: "/admin/settings", icon: Settings },
     ],
   },
 ];

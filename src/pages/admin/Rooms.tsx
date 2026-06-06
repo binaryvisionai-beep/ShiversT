@@ -44,6 +44,7 @@ type Room = {
   og_image: string;
   room_order: number;
   is_active: boolean;
+  gallery_images: string[];
 };
 
 type Analytics = {
@@ -79,6 +80,7 @@ const emptyRoom: Room = {
   og_image: "",
   room_order: 0,
   is_active: true,
+  gallery_images: [],
 };
 
 export default function RoomsAdminPage() {
@@ -99,9 +101,14 @@ export default function RoomsAdminPage() {
 
   const totalBookings = useMemo(() => analytics.length, [analytics]);
 
+  const [heroImage, setHeroImage] = useState("");
+  const [uploadingHero, setUploadingHero] = useState(false);
+  const [heroId, setHeroId] = useState("");
+
   useEffect(() => {
     loadRooms();
     loadAnalytics();
+    loadHeroImage();
   }, []);
 
   const loadRooms = async () => {
@@ -306,6 +313,187 @@ export default function RoomsAdminPage() {
     }
   };
 
+
+  const handleGalleryUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (!editing) return;
+  
+    const files = Array.from(e.target.files || []);
+  
+    if (!files.length) return;
+  
+    try {
+      const uploadedUrls: string[] = [];
+  
+      for (const file of files) {
+        const fileName = `${Date.now()}-${file.name}`;
+  
+        const { error } = await supabase.storage
+          .from("rooms")
+          .upload(fileName, file);
+  
+        if (error) continue;
+  
+        const {
+          data: { publicUrl },
+        } = supabase.storage
+          .from("rooms")
+          .getPublicUrl(fileName);
+  
+        uploadedUrls.push(publicUrl);
+      }
+  
+      setEditing({
+        ...editing,
+        gallery_images: [
+          ...(editing.gallery_images || []),
+          ...uploadedUrls,
+        ],
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+
+
+  const loadHeroImage = async () => {
+    const { data, error } = await supabase
+      .from("rooms_page_settings")
+      .select("*")
+      .single();
+  
+    if (error) {
+      console.error(error);
+      return;
+    }
+  
+    console.log("ROOM SETTINGS", data);
+  
+    setHeroId(data.id);
+    console.log("Loaded Hero ID:", data.id);
+    setHeroImage(data.hero_image || "");
+  };
+  // const loadHeroImage = async () => {
+  //   const { data } = await supabase
+  //     .from("rooms_page_settings")
+  //     .select("*")
+  //     .single();
+  
+  //   if (data?.hero_image) {
+  //     setHeroImage(data.hero_image);
+  //   }
+  // };
+
+
+  const handleHeroUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+  
+    if (!file) return;
+  
+    try {
+      setUploadingHero(true);
+      setMessage("");
+  
+      const fileName = `hero-${Date.now()}-${file.name}`;
+  
+      const { error } = await supabase.storage
+        .from("rooms")
+        .upload(fileName, file);
+  
+      if (error) {
+        console.error(error);
+        setMessage("Failed to upload hero image");
+        return;
+      }
+  
+      const {
+        data: { publicUrl },
+      } = supabase.storage
+        .from("rooms")
+        .getPublicUrl(fileName);
+  
+        console.log("heroId =", heroId);
+        if (!heroId) {
+          alert("Hero ID not loaded");
+          return;
+        }
+      // const { error: updateError } = await supabase
+      //   .from("rooms_page_settings")
+      //   .update({
+      //     hero_image: publicUrl,
+      //   })
+      //   .neq("id", "");
+  
+      const { error: updateError } = await supabase
+  .from("rooms_page_settings")
+  .update({
+    hero_image: publicUrl,
+  })
+  .eq("id", heroId);
+
+        if (updateError) {
+          console.error("ROOMS SETTINGS UPDATE ERROR:", updateError);
+          alert(JSON.stringify(updateError, null, 2));
+          setMessage("Failed to save hero image");
+          return;
+        }
+      // if (updateError) {
+      //   console.error(updateError);
+      //   setMessage("Failed to save hero image");
+      //   return;
+      // }
+  
+      setHeroImage(publicUrl);
+      setMessage("Hero image uploaded successfully");
+    } catch (err) {
+      console.error(err);
+      setMessage("Upload failed");
+    } finally {
+      setUploadingHero(false);
+    }
+  };
+
+  // const handleHeroUpload = async (
+  //   e: React.ChangeEvent<HTMLInputElement>
+  // ) => {
+  //   const file = e.target.files?.[0];
+  
+  //   if (!file) return;
+  
+  //   const fileName = `hero-${Date.now()}-${file.name}`;
+  
+  //   const { error } = await supabase.storage
+  //     .from("rooms")
+  //     .upload(fileName, file);
+  
+  //   if (error) {
+  //     console.error(error);
+  //     return;
+  //   }
+  
+  //   const {
+  //     data: { publicUrl },
+  //   } = supabase.storage
+  //     .from("rooms")
+  //     .getPublicUrl(fileName);
+  
+  //   await supabase
+  //     .from("rooms_page_settings")
+  //     .update({
+  //       hero_image: publicUrl,
+  //     })
+  //     .neq("id", "");
+  
+  //     setHeroImage(publicUrl);
+  //     setMessage("Hero image uploaded successfully");
+  //     setUploadingHero(false);
+  // };
+
+
   return (
     <div className="p-6 md:p-8 space-y-8">
       {/* HEADER */}
@@ -445,6 +633,59 @@ export default function RoomsAdminPage() {
           </table>
         </div>
       </div>
+
+
+
+
+
+
+
+      <div className="rounded-3xl border bg-background p-6 space-y-4">
+  <h2 className="text-xl font-semibold">
+    Rooms Hero Image
+  </h2>
+
+  <label className="border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-muted/40 transition-colors">
+    {/* <ImagePlus className="size-10 text-muted-foreground" />
+
+    <span className="text-sm text-muted-foreground">
+      Upload Rooms Hero Image
+    </span> */}
+{uploadingHero ? (
+  <Loader2 className="size-10 animate-spin text-muted-foreground" />
+) : (
+  <ImagePlus className="size-10 text-muted-foreground" />
+)}
+
+<span className="text-sm text-muted-foreground">
+  {uploadingHero
+    ? "Uploading..."
+    : "Upload Rooms Hero Image"}
+</span>
+    <input
+      type="file"
+      accept="image/*"
+      onChange={handleHeroUpload}
+      className="hidden"
+    />
+  </label>
+
+  {heroImage && (
+    <img
+      src={heroImage}
+      alt="Hero"
+      className="w-full h-72 object-cover rounded-3xl border"
+    />
+  )}
+  {message && (
+  <div className="flex items-center gap-2 text-sm text-green-600">
+    <CheckCircle2 className="size-4" />
+    {message}
+  </div>
+)}
+</div>
+
+
 
       {/* ROOMS */}
       <div className="rounded-3xl border bg-background p-6 space-y-6">
@@ -837,6 +1078,9 @@ export default function RoomsAdminPage() {
   <div className="space-y-5">
     <div className="space-y-2">
       <label className="text-sm font-medium">Room Image</label>
+
+ 
+
       <label className="border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-muted/40 transition-colors">
         <ImagePlus className="size-10 text-muted-foreground" />
         <span className="text-sm text-muted-foreground">Click to upload image</span>
@@ -852,6 +1096,8 @@ export default function RoomsAdminPage() {
         />
       </label>
 
+
+
       {(preview || editing.og_image) && (
         <img
           src={preview || editing.og_image}
@@ -860,6 +1106,56 @@ export default function RoomsAdminPage() {
         />
       )}
     </div>
+
+
+    <div className="space-y-2">
+  <label className="text-sm font-medium">
+    Room Gallery Images
+  </label>
+
+  {/* <input
+    type="file"
+    multiple
+    accept="image/*"
+    onChange={handleGalleryUpload}
+    className="w-full"
+  /> */}
+
+
+<label className="border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-muted/40 transition-colors">
+  <ImagePlus className="size-8 text-muted-foreground" />
+
+  <span className="text-sm text-muted-foreground">
+    Upload Gallery Images
+  </span>
+
+  <div className="inline-flex items-center gap-2 text-sm font-medium">
+    <Upload className="size-4" />
+    Select Multiple Images
+  </div>
+
+  <input
+    type="file"
+    multiple
+    accept="image/*"
+    onChange={handleGalleryUpload}
+    className="hidden"
+  />
+</label>
+
+  <div className="grid grid-cols-3 gap-3">
+    {editing.gallery_images?.map((img, index) => (
+      <img
+        key={index}
+        src={img}
+        alt=""
+        className="h-24 w-full object-cover rounded-xl border"
+      />
+    ))}
+  </div>
+</div>
+
+
 {/* Live Preview Card */}
 {(editing.name || editing.short_summary) && (
       <div className="rounded-2xl border p-5 space-y-3 bg-muted/20">

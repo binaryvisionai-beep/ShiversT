@@ -36,6 +36,12 @@ const SECTION_LABELS: Record<string, { label: string; description: string; hasIm
     description: "The closing quote and description shown in the dark invitation section.",
     hasImage: false,
   },
+  about_moment_1: { label: "Moment 1", description: "First image in the moments grid.", hasImage: true },
+  about_moment_2: { label: "Moment 2", description: "Second image in the moments grid.", hasImage: true },
+  about_moment_3: { label: "Moment 3", description: "Third image in the moments grid.", hasImage: true },
+  about_moment_4: { label: "Moment 4", description: "Fourth image in the moments grid.", hasImage: true },
+  about_moment_5: { label: "Moment 5", description: "Fifth image in the moments grid.", hasImage: true },
+  about_moment_6: { label: "Moment 6", description: "Sixth image in the moments grid.", hasImage: true },
 };
 
 export default function AboutAdminPage() {
@@ -56,7 +62,17 @@ export default function AboutAdminPage() {
       const { data, error } = await supabase
         .from("cms_content")
         .select("*")
-        .in("section_key", ["about_intro", "about_philosophy", "about_invite"])
+        .in("section_key", [
+          "about_intro",
+          "about_philosophy",
+          "about_invite",
+          "about_moment_1",
+          "about_moment_2",
+          "about_moment_3",
+          "about_moment_4",
+          "about_moment_5",
+          "about_moment_6",
+        ])
         .order("section_key");
 
       if (error) { console.error(error); return; }
@@ -83,11 +99,11 @@ export default function AboutAdminPage() {
       setPreview(local);
 
       const fileName = `about-${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage.from("homepage").upload(fileName, file);
+      const { error: uploadError } = await supabase.storage.from("about").upload(fileName, file);
 
       if (uploadError) { console.error(uploadError); alert("Upload failed"); return; }
 
-      const { data: { publicUrl } } = supabase.storage.from("homepage").getPublicUrl(fileName);
+      const { data: { publicUrl } } = supabase.storage.from("about").getPublicUrl(fileName);
       setPreview(publicUrl);
       setEditing({ ...editing, image_url: publicUrl });
     } catch (error) {
@@ -241,7 +257,7 @@ export default function AboutAdminPage() {
                 </div>
               )}
 
-              {editing.section_key !== "about_invite" && (
+              {editing.section_key !== "about_invite" && !editing.section_key.startsWith("about_moment_") && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
                     Content

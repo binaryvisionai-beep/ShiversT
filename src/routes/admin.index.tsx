@@ -1,17 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowUpRight,
-  ArrowDownRight,
-  TrendingUp,
   BedDouble,
-  Wallet,
   Users,
   Star,
   CalendarCheck2,
   Clock,
   Sparkles,
   MoreHorizontal,
+  UtensilsCrossed,
+  PartyPopper,
+  MessageSquare,
+  Briefcase,
+  RefreshCw,
 } from "lucide-react";
 import {
   AreaChart,
@@ -23,320 +26,472 @@ import {
   CartesianGrid,
   BarChart,
   Bar,
-  RadialBarChart,
-  RadialBar,
-  PolarAngleAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/auth-context";
+import { supabase } from "@/lib/supabase";
+import { formatDistanceToNow, format, subDays, startOfDay } from "date-fns";
 
 export const Route = createFileRoute("/admin/")({
   component: DashboardPage,
 });
 
-const revenueData = [
-  { m: "Jan", revenue: 42000, prev: 31000 },
-  { m: "Feb", revenue: 51000, prev: 38000 },
-  { m: "Mar", revenue: 48000, prev: 41000 },
-  { m: "Apr", revenue: 61000, prev: 47000 },
-  { m: "May", revenue: 72000, prev: 52000 },
-  { m: "Jun", revenue: 84000, prev: 60000 },
-  { m: "Jul", revenue: 91000, prev: 68000 },
-  { m: "Aug", revenue: 88000, prev: 71000 },
-  { m: "Sep", revenue: 96000, prev: 74000 },
-];
+// ─── Types ────────────────────────────────────────────────────────────────────
+type RecentBooking = {
+  id: string;
+  guest: string;
+  room: string;
+  checkin: string;
+  status: string;
+  type: "room" | "restaurant" | "event";
+};
 
-const occupancyData = [
-  { d: "Mon", v: 64 },
-  { d: "Tue", v: 71 },
-  { d: "Wed", v: 78 },
-  { d: "Thu", v: 82 },
-  { d: "Fri", v: 91 },
-  { d: "Sat", v: 96 },
-  { d: "Sun", v: 88 },
-];
+type ActivityItem = {
+  id: string;
+  text: string;
+  strong: string;
+  sub: string;
+  time: string;
+};
 
-const bookings = [
-  { id: "BK-2841", guest: "Eleanor Hartwell", room: "Presidential Suite", checkin: "Today, 3:00 PM", nights: 4, status: "Confirmed", amount: "$4,820" },
-  { id: "BK-2840", guest: "Marcus Aubergine", room: "Garden Villa 02", checkin: "Today, 5:30 PM", nights: 2, status: "Pending", amount: "$1,640" },
-  { id: "BK-2839", guest: "Sofia Lindqvist", room: "Ocean Loft 14", checkin: "Tomorrow, 2:00 PM", nights: 6, status: "Confirmed", amount: "$5,210" },
-  { id: "BK-2838", guest: "Hiroshi Nakamura", room: "Heritage Suite", checkin: "May 16, 4:00 PM", nights: 3, status: "Confirmed", amount: "$3,180" },
-  { id: "BK-2837", guest: "Ayana Okafor", room: "Rooftop Terrace", checkin: "May 17, 6:00 PM", nights: 1, status: "Cancelled", amount: "$880" },
-];
+type DashStats = {
+  roomBookings: number;
+  restaurantReservations: number;
+  eventEnquiries: number;
+  careerApplications: number;
+  newMessages: number;
+  pendingRoomBookings: number;
+  pendingRestaurantRes: number;
+};
 
-const activity = [
-  { t: "2m", text: "New reservation from ", strong: "Eleanor Hartwell", sub: "Presidential Suite · 4 nights" },
-  { t: "18m", text: "Restaurant booking confirmed for ", strong: "Marcus Aubergine", sub: "Aurelia · 8:30 PM · party of 4" },
-  { t: "1h", text: "Spa treatment scheduled by ", strong: "Sofia Lindqvist", sub: "Signature gold ritual · 90 min" },
-  { t: "3h", text: "Event proposal sent to ", strong: "Aurora Capital", sub: "Private gala · 120 guests" },
-  { t: "5h", text: "Review received from ", strong: "Hiroshi Nakamura", sub: "Heritage Suite · 5 stars" },
-];
+type DailyCount = { d: string; v: number };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function getDayLabel(dateStr: string) {
+  return format(new Date(dateStr), "EEE");
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { session } = useAuth();
   const displayName = session?.name ?? "Guest";
 
+  const [stats, setStats] = useState<DashStats>({
+    roomBookings: 0,
+    restaurantReservations: 0,
+    eventEnquiries: 0,
+    careerApplications: 0,
+    newMessages: 0,
+    pendingRoomBookings: 0,
+    pendingRestaurantRes: 0,
+  });
+
+  const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [weeklyData, setWeeklyData] = useState<DailyCount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  const load = async () => {
+    setRefreshing(true);
+    try {
+      // ── Parallel fetches ──────────────────────────────────────────────────
+      const [
+        { count: roomCount },
+        { count: restaurantCount },
+        { count: eventCount },
+        { count: careerCount },
+        { count: messageCount },
+        { count: pendingRooms },
+        { count: pendingRest },
+        { data: recentRooms },
+        { data: recentRest },
+        { data: recentEvents },
+        { data: recentCareers },
+      ] = await Promise.all([
+        supabase.from("bookings").select("*", { count: "exact", head: true }),
+        supabase.from("restaurant_reservations").select("*", { count: "exact", head: true }),
+        supabase.from("events_event_forms").select("*", { count: "exact", head: true }),
+        supabase.from("careers_applications").select("*", { count: "exact", head: true }),
+        supabase.from("contact_messages").select("*", { count: "exact", head: true }).eq("read", false),
+        supabase.from("bookings").select("*", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("restaurant_reservations").select("*", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("bookings").select("id,guest_name,room_type,check_in,status").order("created_at", { ascending: false }).limit(3),
+        supabase.from("restaurant_reservations").select("id,guest_name,customer_name,reservation_date,reservation_time,status").order("created_at", { ascending: false }).limit(3),
+        supabase.from("events_event_forms").select("id,name,event_name,created_at").order("created_at", { ascending: false }).limit(2),
+        supabase.from("careers_applications").select("id,full_name,created_at").order("created_at", { ascending: false }).limit(2),
+      ]);
+
+      setStats({
+        roomBookings:           roomCount       ?? 0,
+        restaurantReservations: restaurantCount ?? 0,
+        eventEnquiries:         eventCount      ?? 0,
+        careerApplications:     careerCount     ?? 0,
+        newMessages:            messageCount    ?? 0,
+        pendingRoomBookings:    pendingRooms    ?? 0,
+        pendingRestaurantRes:   pendingRest     ?? 0,
+      });
+
+      // ── Recent bookings merged ─────────────────────────────────────────
+      const merged: RecentBooking[] = [
+        ...(recentRooms ?? []).map((r: any) => ({
+          id: r.id,
+          guest: r.guest_name ?? "Guest",
+          room: r.room_type ?? "Room",
+          checkin: r.check_in ? format(new Date(r.check_in), "d MMM") : "—",
+          status: r.status ?? "pending",
+          type: "room" as const,
+        })),
+        ...(recentRest ?? []).map((r: any) => ({
+          id: r.id,
+          guest: r.guest_name || r.customer_name || "Guest",
+          room: `Table — ${r.reservation_date ? format(new Date(r.reservation_date), "d MMM") : ""}`,
+          checkin: r.reservation_time ?? "—",
+          status: r.status ?? "pending",
+          type: "restaurant" as const,
+        })),
+      ].slice(0, 5);
+      setRecentBookings(merged);
+
+      // ── Activity feed ──────────────────────────────────────────────────
+      const acts: ActivityItem[] = [
+        ...(recentRooms ?? []).slice(0, 2).map((r: any) => ({
+          id: `room-${r.id}`,
+          text: "Room booking from ",
+          strong: r.guest_name ?? "Guest",
+          sub: `${r.room_type ?? "Room"} · Check-in ${r.check_in ? format(new Date(r.check_in), "d MMM") : ""}`,
+          time: r.created_at,
+        })),
+        ...(recentRest ?? []).slice(0, 2).map((r: any) => ({
+          id: `res-${r.id}`,
+          text: "Table reservation from ",
+          strong: r.guest_name || r.customer_name || "Guest",
+          sub: `${r.reservation_date ? format(new Date(r.reservation_date), "d MMM") : ""} · ${r.reservation_time ?? ""}`,
+          time: r.created_at,
+        })),
+        ...(recentEvents ?? []).map((r: any) => ({
+          id: `ev-${r.id}`,
+          text: "Event enquiry from ",
+          strong: r.name ?? "Guest",
+          sub: r.event_name ? `For: ${r.event_name}` : "General enquiry",
+          time: r.created_at,
+        })),
+        ...(recentCareers ?? []).map((r: any) => ({
+          id: `ca-${r.id}`,
+          text: "Career application from ",
+          strong: r.full_name ?? "Applicant",
+          sub: "Applied to join the team",
+          time: r.created_at,
+        })),
+      ]
+        .filter((a) => a.time)
+        .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+        .slice(0, 6);
+      setActivity(acts);
+
+      // ── Weekly reservations chart (last 7 days) ────────────────────────
+      const days = Array.from({ length: 7 }, (_, i) => {
+        const d = subDays(new Date(), 6 - i);
+        return { date: startOfDay(d), label: format(d, "EEE") };
+      });
+
+      const since = days[0].date.toISOString();
+      const { data: weekRooms } = await supabase
+        .from("bookings")
+        .select("created_at")
+        .gte("created_at", since);
+      const { data: weekRest } = await supabase
+        .from("restaurant_reservations")
+        .select("created_at")
+        .gte("created_at", since);
+
+      const countByDay: Record<string, number> = {};
+      [...(weekRooms ?? []), ...(weekRest ?? [])].forEach((r: any) => {
+        const label = getDayLabel(r.created_at);
+        countByDay[label] = (countByDay[label] ?? 0) + 1;
+      });
+
+      setWeeklyData(days.map(({ label }) => ({ d: label, v: countByDay[label] ?? 0 })));
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error("Dashboard load error:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const todayStr = format(new Date(), "EEEE · d MMMM yyyy");
+
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0 max-w-full overflow-x-hidden">
-      {/* Header */}
+
+      {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between min-w-0">
         <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            Thursday · May 14, 2026
-          </p>
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{todayStr}</p>
           <h1 className="font-display text-2xl sm:text-3xl md:text-4xl mt-1 break-words leading-tight">
             Welcome back,{" "}
             <span className="text-gradient-amber break-words">{displayName}</span>
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Here's what's unfolding across the estate today.
+            Here's what's happening across Shivers today.
           </p>
         </div>
-        <div className="hidden sm:flex flex-col sm:flex-row gap-2 w-full md:w-auto shrink-0">
-          <Button variant="outline" className="rounded-xl h-11 w-full sm:w-auto">
-            Last 30 days
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto shrink-0">
+          <Button
+            variant="outline"
+            className="rounded-xl h-11 w-full sm:w-auto gap-2"
+            onClick={() => void load()}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
           </Button>
           <Button className="rounded-xl h-11 w-full sm:w-auto bg-gradient-amber border-0 text-primary-foreground shadow-glow hover:opacity-95">
-            <Sparkles className="size-4 shrink-0" /> New booking
+            <Sparkles className="size-4 shrink-0" /> New Booking
           </Button>
         </div>
       </div>
 
-      {/* Mobile FAB — Android-style primary action */}
-      <Button
-        className="md:hidden fixed right-4 z-30 size-14 rounded-2xl p-0 shadow-lift bg-gradient-amber border-0 text-primary-foreground hover:opacity-95 bottom-[calc(4.75rem+env(safe-area-inset-bottom))]"
-        aria-label="New booking"
-      >
-        <Sparkles className="size-6" />
-      </Button>
+      {/* Last updated */}
+      {!loading && (
+        <p className="text-xs text-muted-foreground">
+          Last updated {formatDistanceToNow(lastUpdated, { addSuffix: true })}
+        </p>
+      )}
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 min-w-0">
+      {/* ── KPI Cards ────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 min-w-0">
         <KPICard
-          label="Total Revenue"
-          value="—"
-          delta="—"
-          icon={Wallet}
-          spark={[0, 0, 0, 0, 0, 0, 0, 0, 0]}
+          label="Room Bookings"
+          value={loading ? "—" : String(stats.roomBookings)}
+          sub={loading ? "" : `${stats.pendingRoomBookings} pending`}
+          icon={BedDouble}
           accent
         />
         <KPICard
-          label="Occupancy Rate"
-          value="—"
-          delta="—"
-          icon={BedDouble}
-          spark={[0, 0, 0, 0, 0, 0, 0, 0, 0]}
+          label="Table Reservations"
+          value={loading ? "—" : String(stats.restaurantReservations)}
+          sub={loading ? "" : `${stats.pendingRestaurantRes} pending`}
+          icon={UtensilsCrossed}
         />
         <KPICard
-          label="New Reservations"
-          value="—"
-          delta="—"
-          icon={CalendarCheck2}
-          spark={[0, 0, 0, 0, 0, 0, 0, 0, 0]}
+          label="Event Enquiries"
+          value={loading ? "—" : String(stats.eventEnquiries)}
+          sub="Total submitted"
+          icon={PartyPopper}
         />
         <KPICard
-          label="Avg. Guest Score"
-          value="—"
-          delta="—"
-          icon={Star}
-          spark={[0, 0, 0, 0, 0, 0, 0, 0, 0]}
+          label="Applications"
+          value={loading ? "—" : String(stats.careerApplications)}
+          sub="Career submissions"
+          icon={Briefcase}
         />
       </div>
 
-      {/* Revenue + Occupancy */}
+      {/* ── Charts row ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 min-w-0">
+
+        {/* Weekly activity bar chart */}
         <Card className="lg:col-span-2 min-w-0">
-          <CardHeader title="Revenue Analytics" sub="Compared to previous period">
-            <div className="flex flex-wrap items-center gap-3 text-xs">
-              <Legend color="var(--primary)" label="This year" />
-              <Legend color="color-mix(in oklab, var(--bronze) 60%, transparent)" label="Last year" />
+          <CardHeader title="Weekly Bookings" sub="Combined room + restaurant reservations (last 7 days)" />
+          {loading ? (
+            <div className="h-52 flex items-center justify-center text-sm text-muted-foreground">
+              Loading chart...
             </div>
-          </CardHeader>
-          <div className="h-52 sm:h-64 lg:h-72 min-w-0 w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
-              <AreaChart data={revenueData} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.45} />
-                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--bronze)" stopOpacity={0.25} />
-                    <stop offset="100%" stopColor="var(--bronze)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--border)" vertical={false} strokeDasharray="3 6" />
-                <XAxis
-                  dataKey="m"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
-                  interval="preserveStartEnd"
-                />
-                <YAxis
-                  width={36}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
-                  tickFormatter={(v) => `$${v / 1000}k`}
-                />
-                <RTooltip content={<ChartTip />} />
-                <Area type="monotone" dataKey="prev" stroke="var(--bronze)" strokeWidth={2} fill="url(#g2)" />
-                <Area type="monotone" dataKey="revenue" stroke="var(--primary)" strokeWidth={2.5} fill="url(#g1)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          ) : (
+            <div className="h-52 sm:h-64 min-w-0 w-full overflow-hidden">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
+                <BarChart data={weeklyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid stroke="var(--border)" vertical={false} strokeDasharray="3 6" />
+                  <XAxis
+                    dataKey="d"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                    allowDecimals={false}
+                  />
+                  <RTooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="rounded-xl border border-border bg-popover shadow-lift p-3 text-xs">
+                          <div className="font-medium mb-1">{label}</div>
+                          <div className="text-muted-foreground">
+                            {payload[0]?.value} booking{payload[0]?.value === 1 ? "" : "s"}
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar dataKey="v" radius={[8, 8, 8, 8]} fill="var(--primary)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </Card>
 
-        <Card className="min-w-0">
-          <CardHeader title="Occupancy" sub="This week" />
-          <div className="flex flex-col sm:flex-row sm:items-center gap-6 min-w-0">
-            <div className="relative size-36 sm:size-40 shrink-0 mx-auto sm:mx-0">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <RadialBarChart innerRadius="72%" outerRadius="100%" data={[{ name: "occ", value: 86 }]} startAngle={90} endAngle={-270}>
-                  <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                  <RadialBar background={{ fill: "color-mix(in oklab, var(--primary) 12%, transparent)" }} dataKey="value" cornerRadius={20} fill="var(--primary)" />
-                </RadialBarChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="font-display text-3xl">86%</div>
-                <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Booked</div>
-              </div>
+        {/* Quick stats panel */}
+        <Card className="min-w-0 flex flex-col gap-4">
+          <CardHeader title="At a Glance" sub="Today's pending actions" />
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Loading...</div>
+          ) : (
+            <div className="space-y-3">
+              <QuickStat icon={BedDouble}       label="Pending Room Bookings"      value={stats.pendingRoomBookings}    href="/admin/room-bookings" />
+              <QuickStat icon={UtensilsCrossed} label="Pending Restaurant Res."    value={stats.pendingRestaurantRes}   href="/admin/restaurant"   />
+              <QuickStat icon={PartyPopper}     label="Event Enquiries"            value={stats.eventEnquiries}         href="/admin/events"       />
+              <QuickStat icon={Briefcase}       label="Career Applications"        value={stats.careerApplications}     href="/admin/careers"      />
+              <QuickStat icon={MessageSquare}   label="Unread Messages"            value={stats.newMessages}            href="/admin/messages"     />
             </div>
-            <div className="flex-1 space-y-3 text-sm min-w-0 w-full">
-              <Stat label="Suites" value="92%" color="var(--primary)" />
-              <Stat label="Villas" value="84%" color="var(--gold)" />
-              <Stat label="Lofts" value="78%" color="var(--bronze)" />
-            </div>
-          </div>
-          <div className="h-28 mt-4 min-w-0 w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
-              <BarChart data={occupancyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <XAxis dataKey="d" axisLine={false} tickLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
-                <Bar dataKey="v" radius={[8, 8, 8, 8]} fill="var(--primary)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          )}
         </Card>
       </div>
 
-      {/* Bookings + Activity */}
+      {/* ── Recent Bookings + Activity ────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 min-w-0">
+
+        {/* Recent bookings */}
         <Card className="lg:col-span-2 p-0 overflow-hidden min-w-0">
           <div className="p-4 sm:p-6 pb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
             <div className="min-w-0">
               <h3 className="font-display text-lg">Recent Bookings</h3>
-              <p className="text-sm text-muted-foreground">Latest reservations across the estate</p>
+              <p className="text-sm text-muted-foreground">Latest room + restaurant entries</p>
             </div>
-            <Button variant="ghost" size="sm" className="rounded-lg shrink-0 self-start sm:self-auto">
-              View all <ArrowUpRight className="size-4" />
+            <Button variant="ghost" size="sm" className="rounded-lg shrink-0 self-start sm:self-auto" asChild>
+              <a href="/admin/bookings">View all <ArrowUpRight className="size-4" /></a>
             </Button>
           </div>
 
-          {/* Mobile: card list */}
-          <div className="md:hidden divide-y divide-border border-t border-border">
-            {bookings.map((b) => (
-              <div key={b.id} className="p-4 flex gap-3 min-w-0">
-                <div className="size-10 shrink-0 rounded-full bg-gradient-gold flex items-center justify-center text-xs font-semibold text-coffee">
-                  {b.guest
-                    .split(" ")
-                    .map((n) => n[0])
-                    .slice(0, 2)
-                    .join("")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{b.guest}</p>
-                      <p className="text-xs text-muted-foreground">{b.id}</p>
+          {loading ? (
+            <div className="p-6 text-sm text-muted-foreground text-center">Loading...</div>
+          ) : recentBookings.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">No bookings yet.</div>
+          ) : (
+            <>
+              {/* Mobile */}
+              <div className="md:hidden divide-y divide-border border-t border-border">
+                {recentBookings.map((b) => (
+                  <div key={b.id} className="p-4 flex gap-3 min-w-0">
+                    <div className="size-10 shrink-0 rounded-full bg-gradient-gold flex items-center justify-center text-xs font-semibold text-coffee">
+                      {getInitials(b.guest)}
                     </div>
-                    <span className="text-sm font-medium shrink-0">{b.amount}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-medium truncate">{b.guest}</p>
+                        <StatusBadge status={b.status} />
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-0.5 truncate">{b.room}</p>
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <Clock className="size-3 shrink-0" /> {b.checkin}
+                        {b.type === "restaurant" && " · Restaurant"}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1 truncate">{b.room}</p>
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <StatusBadge status={b.status} />
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="size-3 shrink-0" />
-                      <span className="truncate">{b.checkin}</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm min-w-[640px]">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/40">
-                  <Th>Reservation</Th>
-                  <Th>Suite</Th>
-                  <Th>Check-in</Th>
-                  <Th>Status</Th>
-                  <Th className="text-right">Total</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.map((b) => (
-                  <tr key={b.id} className="border-t border-border hover:bg-accent/40 transition-colors">
-                    <Td>
-                      <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-full bg-gradient-gold flex items-center justify-center text-xs font-semibold text-coffee">
-                          {b.guest.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-                        </div>
-                        <div className="leading-tight">
-                          <div className="font-medium">{b.guest}</div>
-                          <div className="text-xs text-muted-foreground">{b.id}</div>
-                        </div>
-                      </div>
-                    </Td>
-                    <Td>
-                      <div className="leading-tight">
-                        <div>{b.room}</div>
-                        <div className="text-xs text-muted-foreground">{b.nights} nights</div>
-                      </div>
-                    </Td>
-                    <Td>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Clock className="size-3.5" /> {b.checkin}
-                      </div>
-                    </Td>
-                    <Td><StatusBadge status={b.status} /></Td>
-                    <Td className="text-right font-medium">{b.amount}</Td>
-                  </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+
+              {/* Desktop */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[560px]">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/40">
+                      <Th>Guest</Th>
+                      <Th>Details</Th>
+                      <Th>When</Th>
+                      <Th>Type</Th>
+                      <Th>Status</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentBookings.map((b) => (
+                      <tr key={b.id} className="border-t border-border hover:bg-accent/40 transition-colors">
+                        <Td>
+                          <div className="flex items-center gap-3">
+                            <div className="size-9 shrink-0 rounded-full bg-gradient-gold flex items-center justify-center text-xs font-semibold text-coffee">
+                              {getInitials(b.guest)}
+                            </div>
+                            <span className="font-medium truncate max-w-[120px]">{b.guest}</span>
+                          </div>
+                        </Td>
+                        <Td>
+                          <span className="truncate max-w-[140px] block text-muted-foreground">{b.room}</span>
+                        </Td>
+                        <Td>
+                          <span className="flex items-center gap-1.5 text-muted-foreground">
+                            <Clock className="size-3.5 shrink-0" /> {b.checkin}
+                          </span>
+                        </Td>
+                        <Td>
+                          <span className="capitalize text-xs text-muted-foreground">
+                            {b.type === "room" ? "Room" : "Restaurant"}
+                          </span>
+                        </Td>
+                        <Td><StatusBadge status={b.status} /></Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </Card>
 
+        {/* Activity feed */}
         <Card className="min-w-0">
-          <CardHeader title="Activity" sub="Across all venues">
-            <button className="text-muted-foreground hover:text-foreground">
+          <CardHeader title="Activity" sub="Across all services">
+            <button className="text-muted-foreground hover:text-foreground" onClick={() => void load()}>
               <MoreHorizontal className="size-4" />
             </button>
           </CardHeader>
-          <ol className="relative space-y-5 pl-5 before:content-[''] before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-px before:bg-border">
-            {activity.map((a, i) => (
-              <li key={i} className="relative">
-                <span className="absolute -left-[18px] top-1.5 size-2.5 rounded-full bg-primary ring-4 ring-background" />
-                <div className="text-sm leading-snug">
-                  <span className="text-muted-foreground">{a.text}</span>
-                  <span className="font-medium">{a.strong}</span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5">{a.sub}</div>
-                <div className="text-[11px] text-muted-foreground/70 mt-1">{a.t} ago</div>
-              </li>
-            ))}
-          </ol>
+          {loading ? (
+            <div className="text-sm text-muted-foreground text-center py-6">Loading...</div>
+          ) : activity.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-6">No activity yet.</div>
+          ) : (
+            <ol className="relative space-y-5 pl-5 before:content-[''] before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-px before:bg-border">
+              {activity.map((a) => (
+                <li key={a.id} className="relative">
+                  <span className="absolute -left-[18px] top-1.5 size-2.5 rounded-full bg-primary ring-4 ring-background" />
+                  <div className="text-sm leading-snug">
+                    <span className="text-muted-foreground">{a.text}</span>
+                    <span className="font-medium">{a.strong}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{a.sub}</div>
+                  <div className="text-[11px] text-muted-foreground/70 mt-1">
+                    {formatDistanceToNow(new Date(a.time), { addSuffix: true })}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
         </Card>
       </div>
     </div>
   );
 }
 
-/* ---------- helpers ---------- */
+/* ─── Sub-components ─────────────────────────────────────────────────────────── */
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -351,13 +506,9 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 }
 
 function CardHeader({
-  title,
-  sub,
-  children,
+  title, sub, children,
 }: {
-  title: string;
-  sub?: string;
-  children?: React.ReactNode;
+  title: string; sub?: string; children?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 gap-3 min-w-0">
@@ -370,90 +521,12 @@ function CardHeader({
   );
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <div className="flex items-center gap-2 text-muted-foreground">
-      <span className="size-2 rounded-full" style={{ background: color }} />
-      {label}
-    </div>
-  );
-}
-
-function ChartTip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-xl border border-border bg-popover shadow-lift p-3 text-xs">
-      <div className="font-medium mb-1">{label}</div>
-      {payload.map((p: any) => (
-        <div key={p.dataKey} className="flex items-center gap-2">
-          <span className="size-2 rounded-full" style={{ background: p.color }} />
-          <span className="text-muted-foreground capitalize">{p.dataKey}</span>
-          <span className="ml-auto font-medium">${(p.value / 1000).toFixed(1)}k</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Stat({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div>
-      <div className="flex justify-between text-xs mb-1.5">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{value}</span>
-      </div>
-      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: value }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="h-full rounded-full"
-          style={{ background: color }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <th className={`px-4 lg:px-6 py-3 font-medium whitespace-nowrap ${className}`}>{children}</th>;
-}
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-4 lg:px-6 py-3 ${className}`}>{children}</td>;
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    Confirmed: "bg-primary/10 text-primary border-primary/20",
-    Pending: "bg-gold/15 text-bronze border-gold/30",
-    Cancelled: "bg-destructive/10 text-destructive border-destructive/20",
-  };
-  return (
-    <Badge variant="outline" className={`rounded-full font-normal ${map[status] ?? ""}`}>
-      <span className="size-1.5 rounded-full bg-current mr-1.5" />
-      {status}
-    </Badge>
-  );
-}
-
 function KPICard({
-  label,
-  value,
-  delta,
-  deltaUp,
-  icon: Icon,
-  spark,
-  accent,
+  label, value, sub, icon: Icon, accent,
 }: {
-  label: string;
-  value: string;
-  delta: string;
-  deltaUp?: boolean;
-  icon: React.ComponentType<{ className?: string }>;
-  spark: number[];
-  accent?: boolean;
+  label: string; value: string; sub?: string;
+  icon: React.ComponentType<{ className?: string }>; accent?: boolean;
 }) {
-  const data = spark.map((v, i) => ({ i, v }));
   return (
     <motion.div
       whileHover={{ y: -3 }}
@@ -463,36 +536,65 @@ function KPICard({
       }`}
     >
       <div className="flex items-start justify-between">
-        <div>
+        <div className="min-w-0">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
           <div className="font-display text-2xl sm:text-3xl mt-1.5 truncate">{value}</div>
+          {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
         </div>
-        <div className={`size-10 rounded-xl flex items-center justify-center ${accent ? "bg-gradient-amber text-primary-foreground shadow-glow" : "bg-muted text-foreground"}`}>
+        <div className={`size-10 rounded-xl flex items-center justify-center shrink-0 ${
+          accent ? "bg-gradient-amber text-primary-foreground shadow-glow" : "bg-muted text-foreground"
+        }`}>
           <Icon className="size-[18px]" />
-        </div>
-      </div>
-      <div className="flex items-end justify-between mt-4">
-        <div className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${deltaUp ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-          {delta !== "—" && (deltaUp ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />)}
-          {delta}
-        </div>
-        <div className="h-10 w-20 sm:w-24 shrink-0 overflow-hidden">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-            <AreaChart data={data}>
-              <defs>
-                <linearGradient id={`sp-${label}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area dataKey="v" stroke="var(--primary)" strokeWidth={2} fill={`url(#sp-${label})`} />
-            </AreaChart>
-          </ResponsiveContainer>
         </div>
       </div>
     </motion.div>
   );
 }
 
-// silence unused imports for icons not in main list
-void Users;
+function QuickStat({
+  icon: Icon, label, value, href,
+}: {
+  icon: React.ComponentType<{ className?: string }>; label: string; value: number; href: string;
+}) {
+  return (
+    <a
+      href={href}
+      className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 hover:bg-muted/40 transition-colors group"
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="size-8 rounded-lg bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
+          <Icon className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
+        </span>
+        <span className="text-sm text-muted-foreground truncate">{label}</span>
+      </div>
+      <span className="font-display text-lg shrink-0">{value}</span>
+    </a>
+  );
+}
+
+function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <th className={`px-4 lg:px-5 py-3 font-medium whitespace-nowrap ${className}`}>{children}</th>;
+}
+function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`px-4 lg:px-5 py-3 ${className}`}>{children}</td>;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = status.toLowerCase();
+  const map: Record<string, string> = {
+    confirmed: "bg-primary/10 text-primary border-primary/20",
+    pending:   "bg-gold/15 text-bronze border-gold/30",
+    cancelled: "bg-destructive/10 text-destructive border-destructive/20",
+    completed: "bg-muted text-muted-foreground border-border",
+    new:       "bg-blue-100 text-blue-700 border-blue-200",
+  };
+  return (
+    <Badge variant="outline" className={`rounded-full font-normal capitalize ${map[s] ?? ""}`}>
+      <span className="size-1.5 rounded-full bg-current mr-1.5" />
+      {s}
+    </Badge>
+  );
+}
+
+// silence unused
+void Star; void Users; void CalendarCheck2;

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ImagePlus, Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -38,29 +39,73 @@ type FileItem = {
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpload: (file: File, category: GalleryCategory) => Promise<void>;
-  defaultCategory?: GalleryCategory;
+  onUpload: (file: File, category: string) => Promise<void>;
+  /** Existing DB categories so admin can pick them; new ones can also be typed */
+  existingCategories?: string[];
+  defaultCategory?: string;
 };
 
 export function GalleryUploadModal({
   open,
   onOpenChange,
   onUpload,
+  existingCategories = ["food", "ambiance"],
   defaultCategory = "ambiance",
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [category, setCategory] = useState<GalleryCategory>(defaultCategory);
+  const [category, setCategory] = useState<string>(defaultCategory);
+  const [customCategory, setCustomCategory] = useState("");
   const [items, setItems] = useState<FileItem[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+
+  // Reset when closed
+  useEffect(() => {
+    if (!open) {
+      items.forEach((i) => URL.revokeObjectURL(i.preview));
+      setItems([]);
+      setCustomCategory("");
+      setCategory(defaultCategory);
+    }
+  }, [open]);
+
+  const effectiveCategory = customCategory.trim() || category;
+
+  // const addFiles = useCallback(
+  //   (files: FileList | File[]) => {
+  //     const next: FileItem[] = [];
+  //     Array.from(files).forEach((file) => {
+        // Basic size check (8 MB)
+        // if (file.size > 8 * 1024 * 1024) {
+        //   toast.error(`${file.name} exceeds 8 MB`);
+        //   return;
+  //       if (!file.type.startsWith("image/")) {
+  // toast.error(`${file.name} is not an image`);
+  // return;
+// }
+        // }
+        // if (!file.type.startsWith("image/")) {
+        //   toast.error(`${file.name} is not an image`);
+        //   return;
+        // }
+        // next.push({
+        //   id: crypto.randomUUID(),
+        //   file,
+  //         preview: URL.createObjectURL(file),
+  //         status: "pending",
+  //       });
+  //     });
+  //     setItems((prev) => [...prev, ...next]);
+  //   },
+  //   [],
+  // );
 
   const addFiles = useCallback(
     (files: FileList | File[]) => {
       const next: FileItem[] = [];
       Array.from(files).forEach((file) => {
-        const parsed = uploadFileSchema.safeParse({ file, category });
-        if (!parsed.success) {
-          toast.error(parsed.error.errors[0]?.message ?? "Invalid file");
+        if (!file.type.startsWith("image/")) {
+          toast.error(`${file.name} is not an image`);
           return;
         }
         next.push({
@@ -72,9 +117,10 @@ export function GalleryUploadModal({
       });
       setItems((prev) => [...prev, ...next]);
     },
-    [category],
+    [],
   );
 
+  
   const removeItem = (id: string) => {
     setItems((prev) => {
       const item = prev.find((i) => i.id === id);
@@ -89,24 +135,17 @@ export function GalleryUploadModal({
     let done = 0;
 
     for (const item of items) {
-      if (item.status === "done") {
-        done++;
-        continue;
-      }
-      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: "uploading" } : i)));
+      if (item.status === "done") { done++; continue; }
+      setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, status: "uploading" } : i));
       try {
-        await onUpload(item.file, category);
+        await onUpload(item.file, effectiveCategory);
         done++;
-        setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: "done" } : i)));
+        setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, status: "done" } : i));
       } catch (e) {
         setItems((prev) =>
           prev.map((i) =>
             i.id === item.id
-              ? {
-                  ...i,
-                  status: "error",
-                  error: e instanceof Error ? e.message : "Upload failed",
-                }
+              ? { ...i, status: "error", error: e instanceof Error ? e.message : "Upload failed" }
               : i,
           ),
         );
@@ -134,6 +173,9 @@ export function GalleryUploadModal({
     onOpenChange(next);
   };
 
+  // All known categories = existing + any newly typed custom one
+  const allCategories = Array.from(new Set([...existingCategories]));
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-xl rounded-2xl border-border p-0 overflow-hidden">
@@ -146,18 +188,16 @@ export function GalleryUploadModal({
             exit="exit"
           >
             <DialogHeader className="p-6 pb-2">
-              <DialogTitle className="font-display text-2xl">Upload visuals</DialogTitle>
+              <DialogTitle className="font-display text-2xl">Upload images</DialogTitle>
               <DialogDescription>
-                Drop luxury photography. Images are compressed and optimized automatically.
+                Drop photography. Images render at their natural size on the public gallery.
               </DialogDescription>
             </DialogHeader>
 
             <div className="px-6 space-y-4">
+              {/* Drop zone */}
               <motion.div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -174,7 +214,9 @@ export function GalleryUploadModal({
               >
                 <Upload className="size-8 mx-auto text-gold mb-3" />
                 <p className="text-sm font-medium">Drag & drop or click to browse</p>
-                <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, WebP up to 8MB</p>
+                {/* <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, WebP up to 8 MB</p> */}
+                <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, WebP</p>
+
                 <input
                   ref={inputRef}
                   type="file"
@@ -188,21 +230,46 @@ export function GalleryUploadModal({
                 />
               </motion.div>
 
+              {/* Category — pick existing or type a new one */}
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-widest text-muted-foreground">
                   Category
                 </Label>
-                <Select value={category} onValueChange={(v) => setCategory(v as GalleryCategory)}>
+                <Select
+                  value={customCategory ? "__custom__" : category}
+                  onValueChange={(v) => {
+                    if (v === "__custom__") return;
+                    setCategory(v);
+                    setCustomCategory("");
+                  }}
+                >
                   <SelectTrigger className="rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="food">Food</SelectItem>
-                    <SelectItem value="ambiance">Ambiance</SelectItem>
+                    {allCategories.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c.charAt(0).toUpperCase() + c.slice(1)}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="__custom__">+ New category…</SelectItem>
                   </SelectContent>
                 </Select>
+                <Input
+                  placeholder="Type new category name (e.g. drinks)"
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  className="rounded-xl"
+                />
+                {customCategory.trim() && (
+                  <p className="text-xs text-muted-foreground">
+                    New category: <span className="font-medium text-foreground">{customCategory.trim()}</span>
+                    {" "}— will appear in the public site filter automatically.
+                  </p>
+                )}
               </div>
 
+              {/* Upload progress */}
               {isPublishing && items.length > 0 && (
                 <div className="space-y-1">
                   <Progress value={progress} className="h-1.5" />
@@ -210,6 +277,7 @@ export function GalleryUploadModal({
                 </div>
               )}
 
+              {/* Preview grid */}
               {items.length > 0 && (
                 <motion.div
                   layout
@@ -232,13 +300,15 @@ export function GalleryUploadModal({
                           <ImagePlus className="size-5 text-primary" />
                         </div>
                       )}
+                      {item.status === "error" && (
+                        <div className="absolute inset-0 bg-destructive/20 flex items-center justify-center">
+                          <X className="size-5 text-destructive" />
+                        </div>
+                      )}
                       {item.status === "pending" && (
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeItem(item.id);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
                           className="absolute top-1 right-1 size-6 rounded-full bg-card/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           aria-label="Remove"
                         >
@@ -248,14 +318,6 @@ export function GalleryUploadModal({
                     </motion.div>
                   ))}
                 </motion.div>
-              )}
-
-              {isPublishing && items.length === 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {[1, 2, 3].map((n) => (
-                    <Skeleton key={n} className="aspect-square rounded-xl" />
-                  ))}
-                </div>
               )}
             </div>
 
@@ -269,9 +331,7 @@ export function GalleryUploadModal({
                 onClick={() => void handlePublish()}
               >
                 {isPublishing ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" /> Publishing…
-                  </>
+                  <><Loader2 className="size-4 animate-spin" /> Publishing…</>
                 ) : (
                   <>Publish {items.length > 0 ? `(${items.length})` : ""}</>
                 )}

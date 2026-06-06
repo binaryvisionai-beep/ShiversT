@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminWhatsappRouteImport } from './routes/admin.whatsapp'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminTiffinboxRouteImport } from './routes/admin.tiffinbox'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
@@ -26,6 +27,8 @@ import { Route as AdminMarketingRoutesRouteImport } from './routes/admin.marketi
 import { Route as AdminHomepageRouteImport } from './routes/admin.homepage'
 import { Route as AdminGalleryRouteImport } from './routes/admin.gallery'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
+import { Route as AdminContactsRouteImport } from './routes/admin.contacts'
+import { Route as AdminCareersRouteImport } from './routes/admin.careers'
 import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAboutRouteImport } from './routes/admin.about'
@@ -43,6 +46,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminWhatsappRoute = AdminWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
@@ -115,6 +123,16 @@ const AdminEventsRoute = AdminEventsRouteImport.update({
   path: '/events',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminContactsRoute = AdminContactsRouteImport.update({
+  id: '/contacts',
+  path: '/contacts',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCareersRoute = AdminCareersRouteImport.update({
+  id: '/careers',
+  path: '/careers',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminBookingsRoute = AdminBookingsRouteImport.update({
   id: '/bookings',
   path: '/bookings',
@@ -137,6 +155,8 @@ export interface FileRoutesByFullPath {
   '/admin/about': typeof AdminAboutRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/careers': typeof AdminCareersRoute
+  '/admin/contacts': typeof AdminContactsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
@@ -151,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/tiffinbox': typeof AdminTiffinboxRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/whatsapp': typeof AdminWhatsappRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -158,6 +179,8 @@ export interface FileRoutesByTo {
   '/admin/about': typeof AdminAboutRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/careers': typeof AdminCareersRoute
+  '/admin/contacts': typeof AdminContactsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
@@ -172,6 +195,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/tiffinbox': typeof AdminTiffinboxRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/whatsapp': typeof AdminWhatsappRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
@@ -181,6 +205,8 @@ export interface FileRoutesById {
   '/admin/about': typeof AdminAboutRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/careers': typeof AdminCareersRoute
+  '/admin/contacts': typeof AdminContactsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
@@ -195,6 +221,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/tiffinbox': typeof AdminTiffinboxRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/whatsapp': typeof AdminWhatsappRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -205,6 +232,8 @@ export interface FileRouteTypes {
     | '/admin/about'
     | '/admin/analytics'
     | '/admin/bookings'
+    | '/admin/careers'
+    | '/admin/contacts'
     | '/admin/events'
     | '/admin/gallery'
     | '/admin/homepage'
@@ -219,6 +248,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/tiffinbox'
     | '/admin/users'
+    | '/admin/whatsapp'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -226,6 +256,8 @@ export interface FileRouteTypes {
     | '/admin/about'
     | '/admin/analytics'
     | '/admin/bookings'
+    | '/admin/careers'
+    | '/admin/contacts'
     | '/admin/events'
     | '/admin/gallery'
     | '/admin/homepage'
@@ -240,6 +272,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/tiffinbox'
     | '/admin/users'
+    | '/admin/whatsapp'
     | '/admin'
   id:
     | '__root__'
@@ -248,6 +281,8 @@ export interface FileRouteTypes {
     | '/admin/about'
     | '/admin/analytics'
     | '/admin/bookings'
+    | '/admin/careers'
+    | '/admin/contacts'
     | '/admin/events'
     | '/admin/gallery'
     | '/admin/homepage'
@@ -262,6 +297,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/tiffinbox'
     | '/admin/users'
+    | '/admin/whatsapp'
     | '/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -291,6 +327,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/whatsapp': {
+      id: '/admin/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/admin/whatsapp'
+      preLoaderRoute: typeof AdminWhatsappRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/users': {
@@ -391,6 +434,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEventsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/contacts': {
+      id: '/admin/contacts'
+      path: '/contacts'
+      fullPath: '/admin/contacts'
+      preLoaderRoute: typeof AdminContactsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/careers': {
+      id: '/admin/careers'
+      path: '/careers'
+      fullPath: '/admin/careers'
+      preLoaderRoute: typeof AdminCareersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/bookings': {
       id: '/admin/bookings'
       path: '/bookings'
@@ -419,6 +476,8 @@ interface AdminRouteChildren {
   AdminAboutRoute: typeof AdminAboutRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
+  AdminCareersRoute: typeof AdminCareersRoute
+  AdminContactsRoute: typeof AdminContactsRoute
   AdminEventsRoute: typeof AdminEventsRoute
   AdminGalleryRoute: typeof AdminGalleryRoute
   AdminHomepageRoute: typeof AdminHomepageRoute
@@ -433,6 +492,7 @@ interface AdminRouteChildren {
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminTiffinboxRoute: typeof AdminTiffinboxRoute
   AdminUsersRoute: typeof AdminUsersRoute
+  AdminWhatsappRoute: typeof AdminWhatsappRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -440,6 +500,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAboutRoute: AdminAboutRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminBookingsRoute: AdminBookingsRoute,
+  AdminCareersRoute: AdminCareersRoute,
+  AdminContactsRoute: AdminContactsRoute,
   AdminEventsRoute: AdminEventsRoute,
   AdminGalleryRoute: AdminGalleryRoute,
   AdminHomepageRoute: AdminHomepageRoute,
@@ -454,6 +516,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSettingsRoute: AdminSettingsRoute,
   AdminTiffinboxRoute: AdminTiffinboxRoute,
   AdminUsersRoute: AdminUsersRoute,
+  AdminWhatsappRoute: AdminWhatsappRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 
