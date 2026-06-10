@@ -21,6 +21,7 @@ import {
   Sparkles,
   MessageCircle,
   Phone,
+  CircleHelp,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useSidebarState } from "./sidebar-context";
@@ -121,6 +122,7 @@ const NAV: { section: string; items: Item[] }[] = [
       { label: "Careers",                to: "/admin/careers",           icon: Users          },
       { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
       { label: "Contacts", to: "/admin/contacts", icon: Phone },
+      { label: "FAQ", to: "/admin/faq", icon: CircleHelp },
     ],
   },
 

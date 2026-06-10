@@ -26,6 +26,7 @@ import { Route as AdminMessagesRouteImport } from './routes/admin.messages'
 import { Route as AdminMarketingRoutesRouteImport } from './routes/admin.marketing-routes'
 import { Route as AdminHomepageRouteImport } from './routes/admin.homepage'
 import { Route as AdminGalleryRouteImport } from './routes/admin.gallery'
+import { Route as AdminFaqRouteImport } from './routes/admin.faq'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminContactsRouteImport } from './routes/admin.contacts'
 import { Route as AdminCareersRouteImport } from './routes/admin.careers'
@@ -118,6 +119,11 @@ const AdminGalleryRoute = AdminGalleryRouteImport.update({
   path: '/gallery',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFaqRoute = AdminFaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminEventsRoute = AdminEventsRouteImport.update({
   id: '/events',
   path: '/events',
@@ -158,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/admin/careers': typeof AdminCareersRoute
   '/admin/contacts': typeof AdminContactsRoute
   '/admin/events': typeof AdminEventsRoute
+  '/admin/faq': typeof AdminFaqRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
@@ -182,6 +189,7 @@ export interface FileRoutesByTo {
   '/admin/careers': typeof AdminCareersRoute
   '/admin/contacts': typeof AdminContactsRoute
   '/admin/events': typeof AdminEventsRoute
+  '/admin/faq': typeof AdminFaqRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
@@ -208,6 +216,7 @@ export interface FileRoutesById {
   '/admin/careers': typeof AdminCareersRoute
   '/admin/contacts': typeof AdminContactsRoute
   '/admin/events': typeof AdminEventsRoute
+  '/admin/faq': typeof AdminFaqRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
@@ -235,6 +244,7 @@ export interface FileRouteTypes {
     | '/admin/careers'
     | '/admin/contacts'
     | '/admin/events'
+    | '/admin/faq'
     | '/admin/gallery'
     | '/admin/homepage'
     | '/admin/marketing-routes'
@@ -259,6 +269,7 @@ export interface FileRouteTypes {
     | '/admin/careers'
     | '/admin/contacts'
     | '/admin/events'
+    | '/admin/faq'
     | '/admin/gallery'
     | '/admin/homepage'
     | '/admin/marketing-routes'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/admin/careers'
     | '/admin/contacts'
     | '/admin/events'
+    | '/admin/faq'
     | '/admin/gallery'
     | '/admin/homepage'
     | '/admin/marketing-routes'
@@ -427,6 +439,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminGalleryRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/faq': {
+      id: '/admin/faq'
+      path: '/faq'
+      fullPath: '/admin/faq'
+      preLoaderRoute: typeof AdminFaqRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/events': {
       id: '/admin/events'
       path: '/events'
@@ -479,6 +498,7 @@ interface AdminRouteChildren {
   AdminCareersRoute: typeof AdminCareersRoute
   AdminContactsRoute: typeof AdminContactsRoute
   AdminEventsRoute: typeof AdminEventsRoute
+  AdminFaqRoute: typeof AdminFaqRoute
   AdminGalleryRoute: typeof AdminGalleryRoute
   AdminHomepageRoute: typeof AdminHomepageRoute
   AdminMarketingRoutesRoute: typeof AdminMarketingRoutesRoute
@@ -503,6 +523,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCareersRoute: AdminCareersRoute,
   AdminContactsRoute: AdminContactsRoute,
   AdminEventsRoute: AdminEventsRoute,
+  AdminFaqRoute: AdminFaqRoute,
   AdminGalleryRoute: AdminGalleryRoute,
   AdminHomepageRoute: AdminHomepageRoute,
   AdminMarketingRoutesRoute: AdminMarketingRoutesRoute,

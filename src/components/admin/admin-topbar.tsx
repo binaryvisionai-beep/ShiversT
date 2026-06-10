@@ -42,6 +42,10 @@ export const ADMIN_PAGE_LABELS: Record<string, string> = {
   about: "About",
   tiffinbox: "Tiffin Box",
   reviews: "Reviews",
+  faq: "FAQ",
+  careers: "Careers",
+  contacts: "Contacts",
+  whatsapp: "WhatsApp",
 };
 
 function getMobilePageTitle(pathname: string): string {

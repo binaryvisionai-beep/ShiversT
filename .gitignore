@@ -38,3 +38,6 @@ credentials.json
 *.njsproj
 *.sln
 *.sw?
+supabase/.temp/
+.env
+.env.*
