@@ -31,6 +31,7 @@ export const ADMIN_PAGE_LABELS: Record<string, string> = {
   rooms: "Rooms",
   restaurant: "Restaurant",
   events: "Events",
+  edit: "Edit",
   gallery: "Gallery",
   messages: "Messages",
   "marketing-routes": "Marketing Page Routes",
