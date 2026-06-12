@@ -102,7 +102,7 @@ const NAV: { section: string; items: Item[] }[] = [
     section: "Edit",
     items: [
       { label: "Rooms", to: "/admin/rooms", icon: BedDouble },
-      { label: "Table", to: "/admin/reservations", icon: BookMarked },
+      // { label: "Table", to: "/admin/reservations", icon: BookMarked },
       { label: "Events", to: "/admin/events/edit", icon: PartyPopper },
       { label: "Tiffin Box", to: "/admin/tiffinbox", icon: UtensilsCrossed },
     ],
@@ -114,11 +114,11 @@ const NAV: { section: string; items: Item[] }[] = [
       { label: "Gallery", to: "/admin/gallery", icon: Images },
       { label: "Reviews", to: "/admin/reviews", icon: Star },
       // { label: "Messages", to: "/admin/messages", icon: MessageSquare, badge: "3" },
-      // {
-      //   label: "Marketing Page Routes",
-      //   to: "/admin/marketing-routes",
-      //   icon: Route,
-      // },
+      {
+        label: "Marketing Page Routes",
+        to: "/admin/marketing-routes",
+        icon: Route,
+      },
       { label: "Careers",                to: "/admin/careers",           icon: Users          },
       { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
       { label: "Contacts", to: "/admin/contacts", icon: Phone },

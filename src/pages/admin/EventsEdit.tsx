@@ -47,6 +47,8 @@ import {
 import { eventFormSchema, type EventFormValues } from "@/lib/validations/events";
 import type { SpecialEvent } from "@/types/events";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+
 
 const PAGE_SIZE = 8;
 
@@ -70,13 +72,17 @@ export function SpecialEventsPanel({ embedded = false }: SpecialEventsPanelProps
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  // const [uploading, setUploading] = useState(false);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<SpecialEvent | null>(null);
   const [form, setForm] = useState<EventFormValues>(blankForm());
-  const [imageUrl, setImageUrl] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  // const [imageUrl, setImageUrl] = useState("");
+  // const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+const [uploading, setUploading] = useState(false);
+
+
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof EventFormValues, string>>>({});
 
   const [deleteTarget, setDeleteTarget] = useState<SpecialEvent | null>(null);
@@ -114,8 +120,9 @@ export function SpecialEventsPanel({ embedded = false }: SpecialEventsPanelProps
   const openCreate = () => {
     setEditing(null);
     setForm(blankForm());
-    setImageUrl("");
-    setImagePreview(null);
+    // setImageUrl("");
+    // setImagePreview(null);
+    setImageUrls([]);
     setFormErrors({});
     setEditorOpen(true);
   };
@@ -131,8 +138,9 @@ export function SpecialEventsPanel({ embedded = false }: SpecialEventsPanelProps
       sort_order: ev.sort_order,
       is_active: ev.is_active,
     });
-    setImageUrl(ev.images[0]?.image_url ?? "");
-    setImagePreview(ev.images[0]?.image_url ?? null);
+    // setImageUrl(ev.images[0]?.image_url ?? "");
+    // setImagePreview(ev.images[0]?.image_url ?? null);
+    setImageUrls(ev.images.map((img) => img.image_url));
     setFormErrors({});
     setEditorOpen(true);
   };
@@ -141,17 +149,31 @@ export function SpecialEventsPanel({ embedded = false }: SpecialEventsPanelProps
     setEditorOpen(false);
     setEditing(null);
     setForm(blankForm());
-    setImageUrl("");
-    setImagePreview(null);
+    // setImageUrl("");
+    // setImagePreview(null);
+    setImageUrls([]);
     setFormErrors({});
   };
+
+  // const handleImageFile = async (file: File) => {
+  //   setUploading(true);
+  //   try {
+  //     const url = await uploadEventImage(file);
+  //     setImageUrl(url);
+  //     setImagePreview(url);
+  //     toast.success("Image uploaded");
+  //   } catch (e) {
+  //     toast.error(e instanceof Error ? e.message : "Upload failed");
+  //   } finally {
+  //     setUploading(false);
+  //   }
+  // };
 
   const handleImageFile = async (file: File) => {
     setUploading(true);
     try {
       const url = await uploadEventImage(file);
-      setImageUrl(url);
-      setImagePreview(url);
+      setImageUrls((prev) => [...prev, url]);
       toast.success("Image uploaded");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
@@ -159,6 +181,8 @@ export function SpecialEventsPanel({ embedded = false }: SpecialEventsPanelProps
       setUploading(false);
     }
   };
+
+
 
   const validateForm = (): boolean => {
     const result = eventFormSchema.safeParse(form);
@@ -189,25 +213,61 @@ export function SpecialEventsPanel({ embedded = false }: SpecialEventsPanelProps
           sort_order: form.sort_order,
           is_active: form.is_active,
         });
-        if (imageUrl.trim()) {
-          await replaceEventImage(editing.id, imageUrl.trim());
+        // if (imageUrl.trim()) {
+        //   await replaceEventImage(editing.id, imageUrl.trim());
+        // }
+
+
+        if (imageUrls.length > 0) {
+          await supabase.from("events_special_event_images").delete().eq("event_id", editing.id);
+          for (let i = 0; i < imageUrls.length; i++) {
+            await supabase.from("events_special_event_images").insert({ event_id: editing.id, image_url: imageUrls[i], sort_order: i });
+          }
         }
+
         toast.success("Event card updated");
-      } else {
-        await createEvent(
-          {
-            title: form.title,
-            subtitle: form.subtitle,
-            description: form.description,
-            button_text: form.button_text,
-            redirect_url: form.redirect_url.trim() || null,
-            sort_order: form.sort_order,
-            is_active: form.is_active,
-          },
-          imageUrl.trim() || null,
-        );
-        toast.success("Event card created");
+      // } else {
+      //   await createEvent(
+      //     {
+      //       title: form.title,
+      //       subtitle: form.subtitle,
+      //       description: form.description,
+      //       button_text: form.button_text,
+      //       redirect_url: form.redirect_url.trim() || null,
+      //       sort_order: form.sort_order,
+      //       is_active: form.is_active,
+      //     },
+      //     // imageUrl.trim() || null,
+      //     imageUrls[0] ?? null,
+
+      //   );
+      //   toast.success("Event card created");
+      // }
+
+    } else {
+      const newEvent = await createEvent(
+        {
+          title: form.title,
+          subtitle: form.subtitle,
+          description: form.description,
+          button_text: form.button_text,
+          redirect_url: form.redirect_url.trim() || null,
+          sort_order: form.sort_order,
+          is_active: form.is_active,
+        },
+        imageUrls[0] ?? null,
+      );
+      for (let i = 1; i < imageUrls.length; i++) {
+        await supabase.from("events_special_event_images").insert({
+          event_id: newEvent.id,
+          image_url: imageUrls[i],
+          sort_order: i,
+        });
       }
+      toast.success("Event card created");
+    }
+
+
       closeEditor();
       await loadEvents();
     } catch (e) {
@@ -463,8 +523,10 @@ export function SpecialEventsPanel({ embedded = false }: SpecialEventsPanelProps
               {/* Live card preview */}
               <div className="rounded-xl overflow-hidden border bg-muted/30">
                 <div className="aspect-[4/3] bg-muted overflow-hidden">
-                  {imagePreview ? (
-                    <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                  {/* {imagePreview ? (
+                    <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" /> */}
+                    {imageUrls[0] ? (
+                      <img src={imageUrls[0]} alt="Preview" className="h-full w-full object-cover" />
                   ) : (
                     <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
                       Card image preview
@@ -563,7 +625,9 @@ export function SpecialEventsPanel({ embedded = false }: SpecialEventsPanelProps
                   </div>
                 </div>
 
-                <div className="space-y-2">
+
+
+                {/* <div className="space-y-2">
                   <Label>Card Image</Label>
                   <div className="flex gap-2 flex-wrap">
                     <label
@@ -600,7 +664,58 @@ export function SpecialEventsPanel({ embedded = false }: SpecialEventsPanelProps
                       className="rounded-xl flex-1 min-w-[140px]"
                     />
                   </div>
-                </div>
+                </div> */}
+
+<div className="space-y-2">
+  <Label>Card Images</Label>
+  <div className="flex gap-2 flex-wrap">
+    <label className={cn("h-9 px-3 rounded-xl border inline-flex items-center gap-2 text-sm cursor-pointer hover:bg-muted transition-colors", uploading && "opacity-50 pointer-events-none")}>
+      {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
+      {uploading ? "Uploading..." : "Upload Image"}
+      <input
+        type="file"
+        accept="image/*"
+        multiple
+        className="sr-only"
+        disabled={uploading}
+        onChange={async (e) => {
+          const files = Array.from(e.target.files ?? []);
+          for (const file of files) await handleImageFile(file);
+          e.target.value = "";
+        }}
+      />
+    </label>
+    <Input
+      placeholder="Or paste image URL and press Enter"
+      className="rounded-xl flex-1 min-w-[140px]"
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          const val = (e.target as HTMLInputElement).value.trim();
+          if (val) { setImageUrls((prev) => [...prev, val]); (e.target as HTMLInputElement).value = ""; }
+        }
+      }}
+    />
+  </div>
+  {imageUrls.length > 0 && (
+    <div className="grid grid-cols-3 gap-2 mt-2">
+      {imageUrls.map((url, i) => (
+        <div key={i} className="relative aspect-square rounded-lg overflow-hidden border bg-muted">
+          <img src={url} alt={`Image ${i + 1}`} className="h-full w-full object-cover" />
+          <button
+            type="button"
+            onClick={() => setImageUrls((prev) => prev.filter((_, idx) => idx !== i))}
+            className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 rounded-full p-0.5"
+          >
+            <X className="size-3 text-white" />
+          </button>
+          {i === 0 && <span className="absolute bottom-1 left-1 text-[9px] bg-black/60 text-white px-1 rounded">Cover</span>}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
+
 
                 <div className="flex items-center gap-3 rounded-xl border px-4 py-3">
                   <Switch

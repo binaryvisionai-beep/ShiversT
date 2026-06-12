@@ -169,12 +169,8 @@ export interface FileRoutesByFullPath {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/careers': typeof AdminCareersRoute
   '/admin/contacts': typeof AdminContactsRoute
-<<<<<<< HEAD
-  '/admin/events': typeof AdminEventsRoute
-  '/admin/faq': typeof AdminFaqRoute
-=======
   '/admin/events': typeof AdminEventsRouteWithChildren
->>>>>>> eventslink
+  '/admin/faq': typeof AdminFaqRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
@@ -199,12 +195,8 @@ export interface FileRoutesByTo {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/careers': typeof AdminCareersRoute
   '/admin/contacts': typeof AdminContactsRoute
-<<<<<<< HEAD
-  '/admin/events': typeof AdminEventsRoute
-  '/admin/faq': typeof AdminFaqRoute
-=======
   '/admin/events': typeof AdminEventsRouteWithChildren
->>>>>>> eventslink
+  '/admin/faq': typeof AdminFaqRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
@@ -231,12 +223,8 @@ export interface FileRoutesById {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/careers': typeof AdminCareersRoute
   '/admin/contacts': typeof AdminContactsRoute
-<<<<<<< HEAD
-  '/admin/events': typeof AdminEventsRoute
-  '/admin/faq': typeof AdminFaqRoute
-=======
   '/admin/events': typeof AdminEventsRouteWithChildren
->>>>>>> eventslink
+  '/admin/faq': typeof AdminFaqRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
@@ -540,12 +528,8 @@ interface AdminRouteChildren {
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminCareersRoute: typeof AdminCareersRoute
   AdminContactsRoute: typeof AdminContactsRoute
-<<<<<<< HEAD
-  AdminEventsRoute: typeof AdminEventsRoute
-  AdminFaqRoute: typeof AdminFaqRoute
-=======
   AdminEventsRoute: typeof AdminEventsRouteWithChildren
->>>>>>> eventslink
+  AdminFaqRoute: typeof AdminFaqRoute
   AdminGalleryRoute: typeof AdminGalleryRoute
   AdminHomepageRoute: typeof AdminHomepageRoute
   AdminMarketingRoutesRoute: typeof AdminMarketingRoutesRoute
@@ -569,12 +553,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBookingsRoute: AdminBookingsRoute,
   AdminCareersRoute: AdminCareersRoute,
   AdminContactsRoute: AdminContactsRoute,
-<<<<<<< HEAD
-  AdminEventsRoute: AdminEventsRoute,
-  AdminFaqRoute: AdminFaqRoute,
-=======
   AdminEventsRoute: AdminEventsRouteWithChildren,
->>>>>>> eventslink
+  AdminFaqRoute: AdminFaqRoute,
   AdminGalleryRoute: AdminGalleryRoute,
   AdminHomepageRoute: AdminHomepageRoute,
   AdminMarketingRoutesRoute: AdminMarketingRoutesRoute,
