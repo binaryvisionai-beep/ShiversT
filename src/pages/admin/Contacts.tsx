@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────────── 
 
 type ContactInfo = {
   id: string;
