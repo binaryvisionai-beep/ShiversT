@@ -1,16 +1,3 @@
-// import { createFileRoute } from "@tanstack/react-router";
-// import { PlaceholderPage } from "@/components/admin/placeholder-page";
-
-// export const Route = createFileRoute("/admin/users")({
-//   component: () => (
-//     <PlaceholderPage
-//       title="Users"
-//       description="Staff, concierge teams, and access controls."
-//     />
-//   ),
-// });
-
-
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,7 +5,6 @@ import {
   Loader2,
   CheckCircle2,
   X,
-  Mail,
   Plus,
   Shield,
   ShieldCheck,
@@ -28,6 +14,8 @@ import {
   ToggleLeft,
   ToggleRight,
   Search,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/auth-context";
@@ -41,65 +29,97 @@ type Role = "owner" | "manager" | "staff" | "concierge";
 
 type AdminUser = {
   id: string;
-  email: string;
   name: string;
+  email: string;
   role: Role;
   is_active: boolean;
   created_at: string;
+  updated_at: string;
 };
 
 const ROLE_META: Record<Role, { label: string; icon: React.ComponentType<{ className?: string }>; color: string; description: string }> = {
   owner:     { label: "Owner",     icon: ShieldCheck, color: "bg-gold/15 text-bronze border-gold/30",         description: "Full access to everything, including user management" },
   manager:   { label: "Manager",   icon: Shield,      color: "bg-primary/10 text-primary border-primary/20", description: "Manage bookings, content, and staff" },
-  staff:     { label: "Staff",     icon: UserCog,     color: "bg-muted text-muted-foreground border-border", description: "Day-to-day operations - bookings, reservations, enquiries" },
-  concierge: { label: "Concierge", icon: Headset,     color: "bg-blue-100 text-blue-700 border-blue-200",     description: "Guest-facing - view bookings and respond to enquiries" },
+  staff:     { label: "Staff",     icon: UserCog,     color: "bg-muted text-muted-foreground border-border", description: "Day-to-day operations — bookings, reservations, enquiries" },
+  concierge: { label: "Concierge", icon: Headset,     color: "bg-blue-100 text-blue-700 border-blue-200",     description: "Guest-facing — view bookings and respond to enquiries" },
 };
 
 const ROLES: Role[] = ["owner", "manager", "staff", "concierge"];
 
-// ─── Invite Modal ───────────────────────────────────────────────────────────────
-function InviteModal({
+// ─── Add User Modal ─────────────────────────────────────────────────────────────
+function AddUserModal({
   open,
   onClose,
-  onInvited,
+  onAdded,
 }: {
   open: boolean;
   onClose: () => void;
-  onInvited: () => void;
+  onAdded: () => void;
 }) {
-  const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<Role>("staff");
-  const [sending, setSending] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const reset = () => {
+    setName(""); setEmail(""); setPassword(""); setRole("staff"); setError("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) { setError("Email is required"); return; }
-    setSending(true);
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      setError("All fields are required");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    setSaving(true);
     setError("");
     try {
-      // Invite via Supabase Auth (sends magic-link email)
-      const { data, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(email.trim(), {
-        data: { name: name.trim() || email.trim() },
-      });
-      if (inviteErr) throw inviteErr;
+      // Check for existing email in adminauth
+      const { data: existing } = await supabase
+        .from("adminauth")
+        .select("id")
+        .eq("email", email.trim().toLowerCase())
+        .maybeSingle();
 
-      // Set their role in admin_users (the trigger creates the row with default 'staff')
-      if (data?.user?.id) {
-        await supabase.from("admin_users").update({
-          role,
-          name: name.trim() || email.trim(),
-        }).eq("id", data.user.id);
+      if (existing) {
+        setError("A user with this email already exists");
+        setSaving(false);
+        return;
       }
 
-      onInvited();
+      // Insert into adminauth (main login table)
+      const { error: authErr } = await supabase.from("adminauth").insert([{
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: password,
+        role,
+        is_active: true,
+      }]);
+      if (authErr) throw authErr;
+
+      // Also insert into adminsignup for record-keeping
+      await supabase.from("adminsignup").insert([{
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: password,
+        role,
+      }]);
+
+      onAdded();
       onClose();
-      setEmail(""); setName(""); setRole("staff");
+      reset();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send invite. Admin invite requires a service-role key - see note below.");
+      setError(err instanceof Error ? err.message : "Failed to add user");
     } finally {
-      setSending(false);
+      setSaving(false);
     }
   };
 
@@ -122,7 +142,7 @@ function InviteModal({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-background border-b p-5 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Invite Team Member</h2>
+              <h2 className="text-xl font-semibold">Add Team Member</h2>
               <button onClick={onClose} className="size-9 rounded-xl border flex items-center justify-center hover:bg-muted transition-colors">
                 <X className="size-4" />
               </button>
@@ -130,10 +150,10 @@ function InviteModal({
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Full Name</label>
+                <label className="text-xs text-muted-foreground mb-1 block">Full Name *</label>
                 <input
                   className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
-                  placeholder="e.g. Anjali Rodrigues"
+                  placeholder="e.g. Anjali Roy"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
@@ -142,12 +162,33 @@ function InviteModal({
                 <label className="text-xs text-muted-foreground mb-1 block">Email Address *</label>
                 <input
                   type="email"
-                  required
                   className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
                   placeholder="name@goashivers.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Password *</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    className="w-full border rounded-xl px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                    placeholder="Min. 6 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Share this password with the team member so they can log in to the admin panel.
+                </p>
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-2 block">Role</label>
@@ -174,23 +215,18 @@ function InviteModal({
               </div>
 
               {error && (
-                <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600 leading-relaxed">
+                <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
                   {error}
-                  <p className="mt-1 text-red-500">
-                    Note: sending invites requires the Supabase service-role key configured server-side
-                    (Edge Function). Alternatively, add the user manually via Supabase Auth dashboard, then
-                    set their role here.
-                  </p>
                 </div>
               )}
 
               <button
                 type="submit"
-                disabled={sending}
+                disabled={saving}
                 className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-medium text-sm inline-flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                {sending ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-                {sending ? "Sending invite..." : "Send Invite"}
+                {saving ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                {saving ? "Adding..." : "Add User"}
               </button>
             </form>
           </motion.div>
@@ -205,7 +241,7 @@ function UsersPage() {
   const { session } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
   const [message, setMessage] = useState("");
@@ -218,34 +254,41 @@ function UsersPage() {
   const loadUsers = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("admin_users")
-      .select("*")
+      .from("adminauth")
+      .select("id, name, email, role, is_active, created_at, updated_at")
       .order("created_at", { ascending: true });
     if (error) console.error(error);
-    setUsers(data || []);
+    // Default role/is_active for rows that predate the new columns
+    setUsers((data || []).map((u: any) => ({
+      ...u,
+      role: u.role || "staff",
+      is_active: u.is_active ?? true,
+    })));
     setLoading(false);
   };
 
   useEffect(() => { void loadUsers(); }, []);
 
   const updateRole = async (id: string, role: Role) => {
-    const { error } = await supabase.from("admin_users").update({ role }).eq("id", id);
+    const { error } = await supabase.from("adminauth").update({ role }).eq("id", id);
     if (error) { notify("Failed to update role"); return; }
     setUsers((prev) => prev.map((u) => u.id === id ? { ...u, role } : u));
     notify("Role updated");
   };
 
   const toggleActive = async (user: AdminUser) => {
-    const { error } = await supabase.from("admin_users").update({ is_active: !user.is_active }).eq("id", user.id);
+    const { error } = await supabase.from("adminauth").update({ is_active: !user.is_active }).eq("id", user.id);
     if (error) { notify("Failed to update"); return; }
     setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, is_active: !u.is_active } : u));
     notify(user.is_active ? "User deactivated" : "User activated");
   };
 
-  const removeUser = async (id: string) => {
-    if (!confirm("Remove this user's admin access? This does not delete their auth account.")) return;
-    const { error } = await supabase.from("admin_users").delete().eq("id", id);
+  const removeUser = async (id: string, email: string) => {
+    if (!confirm("Remove this user's admin access permanently?")) return;
+    const { error } = await supabase.from("adminauth").delete().eq("id", id);
     if (error) { notify("Failed to remove user"); return; }
+    // Also remove from signup record
+    await supabase.from("adminsignup").delete().eq("email", email);
     setUsers((prev) => prev.filter((u) => u.id !== id));
     notify("User removed");
   };
@@ -253,7 +296,7 @@ function UsersPage() {
   const filtered = users.filter((u) => {
     const matchRole = roleFilter === "all" || u.role === roleFilter;
     const q = search.toLowerCase();
-    const matchSearch = !q || u.name?.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+    const matchSearch = !q || u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
     return matchRole && matchSearch;
   });
 
@@ -264,7 +307,10 @@ function UsersPage() {
   };
 
   const initials = (name: string) =>
-    name.split(" ").filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+    (name || "?").split(" ").filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+
+  // Current user matched by email (since adminauth.id may differ from session id format)
+  const isSelf = (u: AdminUser) => u.email?.toLowerCase() === session?.email?.toLowerCase();
 
   return (
     <div className="p-6 md:p-8 space-y-8">
@@ -284,10 +330,10 @@ function UsersPage() {
             </div>
           )}
           <button
-            onClick={() => setInviteOpen(true)}
+            onClick={() => setAddOpen(true)}
             className="h-10 px-4 rounded-2xl bg-primary text-primary-foreground inline-flex items-center gap-2 text-sm font-medium shrink-0"
           >
-            <Plus className="size-4" /> Invite User
+            <Plus className="size-4" /> Add User
           </button>
         </div>
       </div>
@@ -356,7 +402,7 @@ function UsersPage() {
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-12 text-center">
           <p className="text-muted-foreground text-sm">
-            {users.length === 0 ? "No admin users yet. Invite your first team member." : "No users match your filters."}
+            {users.length === 0 ? "No admin users yet. Add your first team member." : "No users match your filters."}
           </p>
         </div>
       ) : (
@@ -384,7 +430,7 @@ function UsersPage() {
                         <div className="min-w-0">
                           <p className="font-medium truncate">{u.name || "—"}</p>
                           <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-                          {u.id === session?.userId && (
+                          {isSelf(u) && (
                             <span className="text-[10px] text-primary font-medium">You</span>
                           )}
                         </div>
@@ -394,7 +440,7 @@ function UsersPage() {
                       <select
                         value={u.role}
                         onChange={(e) => updateRole(u.id, e.target.value as Role)}
-                        disabled={u.id === session?.userId}
+                        disabled={isSelf(u)}
                         className={`text-xs rounded-full px-2.5 py-1 border font-medium focus:outline-none cursor-pointer ${ROLE_META[u.role].color} disabled:opacity-60 disabled:cursor-not-allowed`}
                       >
                         {ROLES.map((r) => (
@@ -405,7 +451,7 @@ function UsersPage() {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => toggleActive(u)}
-                        disabled={u.id === session?.userId}
+                        disabled={isSelf(u)}
                         className="inline-flex items-center gap-1.5 text-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {u.is_active
@@ -415,12 +461,12 @@ function UsersPage() {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(u.created_at).toLocaleDateString()}
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => removeUser(u.id)}
-                        disabled={u.id === session?.userId}
+                        onClick={() => removeUser(u.id, u.email)}
+                        disabled={isSelf(u)}
                         className="size-8 rounded-lg border flex items-center justify-center hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="size-3.5 text-red-500" />
@@ -444,7 +490,7 @@ function UsersPage() {
                     <p className="font-medium text-sm truncate">{u.name || "—"}</p>
                     <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                   </div>
-                  {u.id === session?.userId && (
+                  {isSelf(u) && (
                     <span className="text-[10px] text-primary font-medium shrink-0">You</span>
                   )}
                 </div>
@@ -452,7 +498,7 @@ function UsersPage() {
                   <select
                     value={u.role}
                     onChange={(e) => updateRole(u.id, e.target.value as Role)}
-                    disabled={u.id === session?.userId}
+                    disabled={isSelf(u)}
                     className={`text-xs rounded-full px-2.5 py-1 border font-medium focus:outline-none ${ROLE_META[u.role].color} disabled:opacity-60`}
                   >
                     {ROLES.map((r) => (
@@ -461,7 +507,7 @@ function UsersPage() {
                   </select>
                   <button
                     onClick={() => toggleActive(u)}
-                    disabled={u.id === session?.userId}
+                    disabled={isSelf(u)}
                     className="inline-flex items-center gap-1.5 text-xs disabled:opacity-60"
                   >
                     {u.is_active
@@ -470,15 +516,15 @@ function UsersPage() {
                     {u.is_active ? "Active" : "Inactive"}
                   </button>
                   <button
-                    onClick={() => removeUser(u.id)}
-                    disabled={u.id === session?.userId}
+                    onClick={() => removeUser(u.id, u.email)}
+                    disabled={isSelf(u)}
                     className="ml-auto size-8 rounded-lg border flex items-center justify-center disabled:opacity-40"
                   >
                     <Trash2 className="size-3.5 text-red-500" />
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Joined {new Date(u.created_at).toLocaleDateString()}
+                  Joined {u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}
                 </p>
               </div>
             ))}
@@ -486,8 +532,7 @@ function UsersPage() {
         </div>
       )}
 
-      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onInvited={() => void loadUsers()} />
+      <AddUserModal open={addOpen} onClose={() => setAddOpen(false)} onAdded={() => void loadUsers()} />
     </div>
   );
 }
-
