@@ -26,12 +26,14 @@ import { Route as AdminMessagesRouteImport } from './routes/admin.messages'
 import { Route as AdminMarketingRoutesRouteImport } from './routes/admin.marketing-routes'
 import { Route as AdminHomepageRouteImport } from './routes/admin.homepage'
 import { Route as AdminGalleryRouteImport } from './routes/admin.gallery'
+import { Route as AdminFaqRouteImport } from './routes/admin.faq'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminContactsRouteImport } from './routes/admin.contacts'
 import { Route as AdminCareersRouteImport } from './routes/admin.careers'
 import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAboutRouteImport } from './routes/admin.about'
+import { Route as AdminEventsEditRouteImport } from './routes/admin.events.edit'
 
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
@@ -118,6 +120,11 @@ const AdminGalleryRoute = AdminGalleryRouteImport.update({
   path: '/gallery',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFaqRoute = AdminFaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminEventsRoute = AdminEventsRouteImport.update({
   id: '/events',
   path: '/events',
@@ -148,6 +155,11 @@ const AdminAboutRoute = AdminAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminEventsEditRoute = AdminEventsEditRouteImport.update({
+  id: '/edit',
+  path: '/edit',
+  getParentRoute: () => AdminEventsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -157,7 +169,8 @@ export interface FileRoutesByFullPath {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/careers': typeof AdminCareersRoute
   '/admin/contacts': typeof AdminContactsRoute
-  '/admin/events': typeof AdminEventsRoute
+  '/admin/events': typeof AdminEventsRouteWithChildren
+  '/admin/faq': typeof AdminFaqRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
@@ -173,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/admin/whatsapp': typeof AdminWhatsappRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/events/edit': typeof AdminEventsEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -181,7 +195,8 @@ export interface FileRoutesByTo {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/careers': typeof AdminCareersRoute
   '/admin/contacts': typeof AdminContactsRoute
-  '/admin/events': typeof AdminEventsRoute
+  '/admin/events': typeof AdminEventsRouteWithChildren
+  '/admin/faq': typeof AdminFaqRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
@@ -197,6 +212,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/admin/whatsapp': typeof AdminWhatsappRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/events/edit': typeof AdminEventsEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -207,7 +223,8 @@ export interface FileRoutesById {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/careers': typeof AdminCareersRoute
   '/admin/contacts': typeof AdminContactsRoute
-  '/admin/events': typeof AdminEventsRoute
+  '/admin/events': typeof AdminEventsRouteWithChildren
+  '/admin/faq': typeof AdminFaqRoute
   '/admin/gallery': typeof AdminGalleryRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/marketing-routes': typeof AdminMarketingRoutesRoute
@@ -223,6 +240,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/admin/whatsapp': typeof AdminWhatsappRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/events/edit': typeof AdminEventsEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -235,6 +253,7 @@ export interface FileRouteTypes {
     | '/admin/careers'
     | '/admin/contacts'
     | '/admin/events'
+    | '/admin/faq'
     | '/admin/gallery'
     | '/admin/homepage'
     | '/admin/marketing-routes'
@@ -250,6 +269,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/whatsapp'
     | '/admin/'
+    | '/admin/events/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -259,6 +279,7 @@ export interface FileRouteTypes {
     | '/admin/careers'
     | '/admin/contacts'
     | '/admin/events'
+    | '/admin/faq'
     | '/admin/gallery'
     | '/admin/homepage'
     | '/admin/marketing-routes'
@@ -274,6 +295,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/whatsapp'
     | '/admin'
+    | '/admin/events/edit'
   id:
     | '__root__'
     | '/'
@@ -284,6 +306,7 @@ export interface FileRouteTypes {
     | '/admin/careers'
     | '/admin/contacts'
     | '/admin/events'
+    | '/admin/faq'
     | '/admin/gallery'
     | '/admin/homepage'
     | '/admin/marketing-routes'
@@ -299,6 +322,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/whatsapp'
     | '/admin/'
+    | '/admin/events/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -427,6 +451,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminGalleryRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/faq': {
+      id: '/admin/faq'
+      path: '/faq'
+      fullPath: '/admin/faq'
+      preLoaderRoute: typeof AdminFaqRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/events': {
       id: '/admin/events'
       path: '/events'
@@ -469,8 +500,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAboutRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/events/edit': {
+      id: '/admin/events/edit'
+      path: '/edit'
+      fullPath: '/admin/events/edit'
+      preLoaderRoute: typeof AdminEventsEditRouteImport
+      parentRoute: typeof AdminEventsRoute
+    }
   }
 }
+
+interface AdminEventsRouteChildren {
+  AdminEventsEditRoute: typeof AdminEventsEditRoute
+}
+
+const AdminEventsRouteChildren: AdminEventsRouteChildren = {
+  AdminEventsEditRoute: AdminEventsEditRoute,
+}
+
+const AdminEventsRouteWithChildren = AdminEventsRoute._addFileChildren(
+  AdminEventsRouteChildren,
+)
 
 interface AdminRouteChildren {
   AdminAboutRoute: typeof AdminAboutRoute
@@ -478,7 +528,8 @@ interface AdminRouteChildren {
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminCareersRoute: typeof AdminCareersRoute
   AdminContactsRoute: typeof AdminContactsRoute
-  AdminEventsRoute: typeof AdminEventsRoute
+  AdminEventsRoute: typeof AdminEventsRouteWithChildren
+  AdminFaqRoute: typeof AdminFaqRoute
   AdminGalleryRoute: typeof AdminGalleryRoute
   AdminHomepageRoute: typeof AdminHomepageRoute
   AdminMarketingRoutesRoute: typeof AdminMarketingRoutesRoute
@@ -502,7 +553,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBookingsRoute: AdminBookingsRoute,
   AdminCareersRoute: AdminCareersRoute,
   AdminContactsRoute: AdminContactsRoute,
-  AdminEventsRoute: AdminEventsRoute,
+  AdminEventsRoute: AdminEventsRouteWithChildren,
+  AdminFaqRoute: AdminFaqRoute,
   AdminGalleryRoute: AdminGalleryRoute,
   AdminHomepageRoute: AdminHomepageRoute,
   AdminMarketingRoutesRoute: AdminMarketingRoutesRoute,
