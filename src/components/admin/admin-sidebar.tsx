@@ -83,8 +83,6 @@ const NAV: { section: string; items: Item[] }[] = [
     section: "Homepage CMS",
     items: [
       { label: "Homepage", to: "/admin/homepage", icon: LayoutDashboard },
-      { label: "About", to: "/admin/about", icon: Users },
-
     ],
   },
 
@@ -105,6 +103,7 @@ const NAV: { section: string; items: Item[] }[] = [
       // { label: "Table", to: "/admin/reservations", icon: BookMarked },
       { label: "Events", to: "/admin/events/edit", icon: PartyPopper },
       { label: "Tiffin Box", to: "/admin/tiffinbox", icon: UtensilsCrossed },
+      { label: "About", to: "/admin/about", icon: Users },
     ],
   },
 
