@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { getImageUploadError } from "@/lib/validate-image-upload";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -229,6 +230,13 @@ export default function AdminHomepagePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const sizeError = getImageUploadError(file);
+    if (sizeError) {
+      alert(sizeError);
+      e.target.value = "";
+      return;
+    }
+
     try {
       setSaveMessage("");
       const localPreview = URL.createObjectURL(file);
@@ -259,6 +267,11 @@ export default function AdminHomepagePage() {
       const uploadedUrls: string[] = [];
 
       for (const [index, file] of Array.from(files).entries()) {
+        const sizeError = getImageUploadError(file);
+        if (sizeError) {
+          alert(`${file.name}: ${sizeError}`);
+          continue;
+        }
         const fileName = `hero-${Date.now()}-${index}-${file.name}`;
         const { error } = await supabase.storage.from("homepage").upload(fileName, file);
         if (error) { console.error(error); alert(`Failed to upload ${file.name}`); continue; }

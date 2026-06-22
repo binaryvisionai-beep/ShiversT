@@ -54,6 +54,7 @@ import { RESTAURANT_TABLES, ZONE_LABELS } from "@/lib/reservations/tables";
 import { formatTimeSlot } from "@/lib/reservations/time-slots";
 import type { Reservation, RestaurantReservation } from "@/lib/reservations/types";
 import { supabase } from "@/lib/supabase";
+import { getImageUploadError } from "@/lib/validate-image-upload";
 import { cn } from "@/lib/utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -343,6 +344,12 @@ function SignatureDishesManager() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    const validationError = getImageUploadError(f);
+    if (validationError) {
+      toast.error(validationError);
+      e.target.value = "";
+      return;
+    }
     setNewFile(f);
     setNewPreview(URL.createObjectURL(f));
   };
@@ -725,6 +732,11 @@ function CmsImageManager() {
     setCmsData((prev) => ({ ...prev, [field]: value }));
 
   const handleFileUpload = async (field: string, file: File) => {
+    const validationError = getImageUploadError(file);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
     setUploading((prev) => ({ ...prev, [field]: true }));
     try {
       const ext = file.name.split(".").pop();

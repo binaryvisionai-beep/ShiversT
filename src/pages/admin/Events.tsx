@@ -16,6 +16,7 @@ import {
 import { SpecialEventsPanel } from "@/pages/admin/EventsEdit";
 import { fetchActiveEventCount } from "@/lib/supabase/events";
 import { supabase } from "@/lib/supabase";
+import { getImageUploadError } from "@/lib/validate-image-upload";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type EventForm = {
@@ -43,6 +44,11 @@ type Tab = "enquiries" | "special" | "hero" | "analytics";
 
 // ─── Upload helper ────────────────────────────────────────────────────────────
 async function uploadToEvents(file: File): Promise<string | null> {
+  const validationError = getImageUploadError(file);
+  if (validationError) {
+    alert(validationError);
+    return null;
+  }
   const ext = file.name.split(".").pop();
   const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await supabase.storage.from("events").upload(path, file, { upsert: true });

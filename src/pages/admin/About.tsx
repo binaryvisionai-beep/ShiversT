@@ -8,6 +8,7 @@ import {
   Upload,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getImageUploadError } from "@/lib/validate-image-upload";
 
 type ImageField = "image_url" | "image_url_2" | "image_url_3";
 
@@ -361,6 +362,13 @@ export default function AboutAdminPage() {
   ) => {
     const file = e.target.files?.[0];
     if (!file || !editing) return;
+
+    const validationError = getImageUploadError(file);
+    if (validationError) {
+      alert(validationError);
+      e.target.value = "";
+      return;
+    }
 
     try {
       setUploadingField(field);

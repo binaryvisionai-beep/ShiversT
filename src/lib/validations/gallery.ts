@@ -26,7 +26,7 @@ export type GalleryImageFormValues = z.infer<typeof galleryImageFormSchema>;
 export const uploadFileSchema = z.object({
   file: z
     .instanceof(File)
-    .refine((f) => f.size <= 8 * 1024 * 1024, "Image must be under 8MB")
+    .refine((f) => f.size <= 5 * 1024 * 1024, "Image must be 5 MB or smaller")
     .refine(
       (f) => ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(f.type),
       "Only JPEG, PNG, WebP, or GIF allowed",

@@ -14,6 +14,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getImageUploadError } from "@/lib/validate-image-upload";
 
 type TiffinContent = {
   id: string;
@@ -141,6 +142,13 @@ const [galleryPreview, setGalleryPreview] = useState<string[]>([]);
 
     if (!file || !editing) return;
 
+    const validationError = getImageUploadError(file);
+    if (validationError) {
+      alert(validationError);
+      e.target.value = "";
+      return;
+    }
+
     try {
       setMessage("");
 
@@ -193,6 +201,12 @@ const [galleryPreview, setGalleryPreview] = useState<string[]>([]);
       const uploadedUrls: string[] = [];
   
       for (const file of Array.from(files)) {
+        const validationError = getImageUploadError(file);
+        if (validationError) {
+          alert(`${file.name}: ${validationError}`);
+          continue;
+        }
+
         const fileName = `gallery-${Date.now()}-${file.name}`;
   
         const { error: uploadError } = await supabase.storage

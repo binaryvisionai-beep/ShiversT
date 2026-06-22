@@ -25,6 +25,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { modalVariants } from "@/lib/animations/gallery";
 import { uploadFileSchema } from "@/lib/validations/gallery";
+import { getImageUploadError } from "@/lib/validate-image-upload";
 import type { GalleryCategory } from "@/types/gallery";
 import { cn } from "@/lib/utils";
 
@@ -104,8 +105,9 @@ export function GalleryUploadModal({
     (files: FileList | File[]) => {
       const next: FileItem[] = [];
       Array.from(files).forEach((file) => {
-        if (!file.type.startsWith("image/")) {
-          toast.error(`${file.name} is not an image`);
+        const validationError = getImageUploadError(file);
+        if (validationError) {
+          toast.error(`${file.name}: ${validationError}`);
           return;
         }
         next.push({

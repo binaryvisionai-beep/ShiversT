@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { assertImageUploadAllowed } from "@/lib/validate-image-upload";
 import type {
   EventImage,
   FetchEventsOptions,
@@ -116,6 +117,7 @@ export async function replaceEventImage(eventId: string, imageUrl: string): Prom
 }
 
 export async function uploadEventImage(file: File): Promise<string> {
+  assertImageUploadAllowed(file);
   const ext = file.name.split(".").pop() ?? "jpg";
   const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });

@@ -18,6 +18,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getImageUploadError } from "@/lib/validate-image-upload";
 
 type Room = {
   id: string;
@@ -184,6 +185,13 @@ export default function RoomsAdminPage() {
 
     if (!file || !editing) return;
 
+    const validationError = getImageUploadError(file);
+    if (validationError) {
+      alert(validationError);
+      e.target.value = "";
+      return;
+    }
+
     try {
       setMessage("");
 
@@ -327,6 +335,12 @@ export default function RoomsAdminPage() {
       const uploadedUrls: string[] = [];
   
       for (const file of files) {
+        const validationError = getImageUploadError(file);
+        if (validationError) {
+          alert(`${file.name}: ${validationError}`);
+          continue;
+        }
+
         const fileName = `${Date.now()}-${file.name}`;
   
         const { error } = await supabase.storage
@@ -393,7 +407,14 @@ export default function RoomsAdminPage() {
     const file = e.target.files?.[0];
   
     if (!file) return;
-  
+
+    const validationError = getImageUploadError(file);
+    if (validationError) {
+      alert(validationError);
+      e.target.value = "";
+      return;
+    }
+
     try {
       setUploadingHero(true);
       setMessage("");

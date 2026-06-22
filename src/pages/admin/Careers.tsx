@@ -18,6 +18,7 @@ import {
   Clock,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { assertImageUploadAllowed, getImageUploadError } from "@/lib/validate-image-upload";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Status = "new" | "reviewed" | "shortlisted" | "rejected";
@@ -53,6 +54,12 @@ function statusColor(s: Status) {
 
 // ─── Upload helper ─────────────────────────────────────────────────────────────
 async function uploadHeroImage(file: File): Promise<string | null> {
+  try {
+    assertImageUploadAllowed(file);
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
   const ext  = file.name.split(".").pop();
   const path = `hero-${Date.now()}.${ext}`;
   const { error } = await supabase.storage.from("careers-hero").upload(path, file, { upsert: true });
@@ -444,10 +451,17 @@ export default function CareersAdminPage() {
                 onChange={async (e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
+                  const validationError = getImageUploadError(f);
+                  if (validationError) {
+                    notify(validationError, "error");
+                    e.target.value = "";
+                    return;
+                  }
                   setHeroUploading(true);
                   const url = await uploadHeroImage(f);
                   setHeroUploading(false);
                   if (url) { setHeroUrl(url); saveHero(url); }
+                  else notify("Upload failed", "error");
                   e.target.value = "";
                 }}
               />

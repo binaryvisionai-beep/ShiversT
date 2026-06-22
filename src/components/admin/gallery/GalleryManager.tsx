@@ -43,6 +43,7 @@ import { useGalleryUpload } from "@/hooks/useGalleryUpload";
 import { pageVariants } from "@/lib/animations/gallery";
 import { deleteGalleryImage, updateGalleryImage } from "@/lib/supabase/gallery";
 import { supabase } from "@/lib/supabase";
+import { getImageUploadError } from "@/lib/validate-image-upload";
 import type { GalleryFilter, GalleryImage, GallerySort } from "@/types/gallery";
 import { cn } from "@/lib/utils";
 
@@ -117,6 +118,12 @@ export function GalleryManager() {
   const handleHeroFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const validationError = getImageUploadError(file);
+    if (validationError) {
+      toast.error(validationError);
+      e.target.value = "";
+      return;
+    }
     setSavingHero(true);
     try {
       const ext = file.name.split(".").pop();

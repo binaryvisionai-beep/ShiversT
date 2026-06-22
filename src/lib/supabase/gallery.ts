@@ -6,6 +6,7 @@ import {
   getGalleryStoragePath,
   getPublicUrl,
 } from "@/lib/image-utils";
+import { assertImageUploadAllowed } from "@/lib/validate-image-upload";
 import type {
   GalleryCategory,
   GalleryFilter,
@@ -145,6 +146,7 @@ export type UploadGalleryInput = {
 };
 
 export async function uploadGalleryImage(input: UploadGalleryInput): Promise<GalleryImage> {
+  assertImageUploadAllowed(input.file);
   const id = crypto.randomUUID();
   const compressed = await compressImage(input.file);
   const blur = await generateBlurDataUrl(compressed);
