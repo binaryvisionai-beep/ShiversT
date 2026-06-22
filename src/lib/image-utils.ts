@@ -62,3 +62,105 @@ export function fileExtension(file: File): string {
   if (file.type === "image/gif") return "gif";
   return "jpg";
 }
+
+export type ImageMeta = {
+  fileName: string;
+  width: number;
+  height: number;
+  aspectRatio: string;
+  orientation: string;
+  megapixels: string;
+  fileSize: string | null;
+  format: string | null;
+};
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+function formatAspectRatio(width: number, height: number): string {
+  const divisor = gcd(width, height);
+  const w = width / divisor;
+  const h = height / divisor;
+  const decimal = (width / height).toFixed(2);
+  if (w <= 20 && h <= 20) return `${w}:${h} (${decimal}:1)`;
+  return `${decimal}:1`;
+}
+
+function getOrientation(width: number, height: number): string {
+  if (width === height) return "Square";
+  return width > height ? "Landscape" : "Portrait";
+}
+
+function getFileNameFromUrl(url: string): string {
+  try {
+    const path = new URL(url).pathname;
+    return decodeURIComponent(path.split("/").pop() || url);
+  } catch {
+    return url.split("/").pop() || url;
+  }
+}
+
+function getFormatFromUrl(url: string): string | null {
+  const name = getFileNameFromUrl(url).toLowerCase();
+  const match = name.match(/\.(jpe?g|png|gif|webp|svg|avif|bmp)$/);
+  return match ? match[1].toUpperCase() : null;
+}
+
+export async function loadImageMeta(url: string): Promise<ImageMeta> {
+  const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = url;
+  });
+
+  let fileSize: string | null = null;
+  try {
+    const res = await fetch(url, { method: "HEAD" });
+    const len = res.headers.get("content-length");
+    if (len) fileSize = formatFileSize(Number(len));
+  } catch {
+  }
+
+  if (!fileSize) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      fileSize = formatFileSize(blob.size);
+    } catch {
+    }
+  }
+
+  return {
+    fileName: getFileNameFromUrl(url),
+    width,
+    height,
+    aspectRatio: formatAspectRatio(width, height),
+    orientation: getOrientation(width, height),
+    megapixels: ((width * height) / 1_000_000).toFixed(2),
+    fileSize,
+    format: getFormatFromUrl(url),
+  };
+}
+
+export async function loadImageMetaFromFile(file: File): Promise<ImageMeta> {
+  const url = URL.createObjectURL(file);
+  try {
+    const meta = await loadImageMeta(url);
+    return {
+      ...meta,
+      fileName: file.name,
+      fileSize: formatFileSize(file.size),
+      format: file.type.split("/")[1]?.toUpperCase() ?? getFormatFromUrl(file.name),
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}

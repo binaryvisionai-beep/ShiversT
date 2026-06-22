@@ -2,10 +2,14 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   CheckCircle2,
+  Eye,
   ImagePlus,
+  Info,
   Loader2,
+  Save,
   Trash2,
   ExternalLink,
+  X,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +23,7 @@ type UploadField =
   | "welcomeCard1Image"
   | "welcomeCard2Image"
   | "welcomeCard3Image"
+  | "welcomeCard4_0Image"
   | "welcomeCard4Image"
   | "offering1Image"
   | "offering2Image"
@@ -27,6 +32,74 @@ type UploadField =
   | "whyChoose2Image"
   | "whyChoose3Image"
   | "whyChoose4Image";
+
+const UPLOAD_FIELD_COLUMNS: Record<UploadField, string> = {
+  logo: "logo",
+  welcomeCard1Image: "welcome_card_1_image",
+  welcomeCard2Image: "welcome_card_2_image",
+  welcomeCard3Image: "welcome_card_3_image",
+  welcomeCard4_0Image: "welcome_card_4_0_image",
+  welcomeCard4Image: "welcome_card_4_image",
+  offering1Image: "offering_1_image",
+  offering2Image: "offering_2_image",
+  offering3Image: "offering_3_image",
+  whyChoose1Image: "why_choose_1_image",
+  whyChoose2Image: "why_choose_2_image",
+  whyChoose3Image: "why_choose_3_image",
+  whyChoose4Image: "why_choose_4_image",
+};
+
+const EMPTY_SAVED_IMAGES: Record<UploadField, string> = {
+  logo: "",
+  welcomeCard1Image: "",
+  welcomeCard2Image: "",
+  welcomeCard3Image: "",
+  welcomeCard4_0Image: "",
+  welcomeCard4Image: "",
+  offering1Image: "",
+  offering2Image: "",
+  offering3Image: "",
+  whyChoose1Image: "",
+  whyChoose2Image: "",
+  whyChoose3Image: "",
+  whyChoose4Image: "",
+};
+
+function savedImagesFromFormData(formData: Record<string, string>): Record<UploadField, string> {
+  return {
+    logo: formData.logo || "",
+    welcomeCard1Image: formData.welcomeCard1Image || "",
+    welcomeCard2Image: formData.welcomeCard2Image || "",
+    welcomeCard3Image: formData.welcomeCard3Image || "",
+    welcomeCard4_0Image: formData.welcomeCard4_0Image || "",
+    welcomeCard4Image: formData.welcomeCard4Image || "",
+    offering1Image: formData.offering1Image || "",
+    offering2Image: formData.offering2Image || "",
+    offering3Image: formData.offering3Image || "",
+    whyChoose1Image: formData.whyChoose1Image || "",
+    whyChoose2Image: formData.whyChoose2Image || "",
+    whyChoose3Image: formData.whyChoose3Image || "",
+    whyChoose4Image: formData.whyChoose4Image || "",
+  };
+}
+
+function savedImagesFromData(data: Record<string, unknown>): Record<UploadField, string> {
+  return {
+    logo: (data.logo as string) || "",
+    welcomeCard1Image: (data.welcome_card_1_image as string) || "",
+    welcomeCard2Image: (data.welcome_card_2_image as string) || "",
+    welcomeCard3Image: (data.welcome_card_3_image as string) || "",
+    welcomeCard4_0Image: (data.welcome_card_4_0_image as string) || "",
+    welcomeCard4Image: (data.welcome_card_4_image as string) || "",
+    offering1Image: (data.offering_1_image as string) || "",
+    offering2Image: (data.offering_2_image as string) || "",
+    offering3Image: (data.offering_3_image as string) || "",
+    whyChoose1Image: (data.why_choose_1_image as string) || "",
+    whyChoose2Image: (data.why_choose_2_image as string) || "",
+    whyChoose3Image: (data.why_choose_3_image as string) || "",
+    whyChoose4Image: (data.why_choose_4_image as string) || "",
+  };
+}
 
 // ─── Hero library helpers ─────────────────────────────────────────────────────
 function parseHeroImagesLibrary(stored: unknown): string[] {
@@ -50,6 +123,102 @@ function mergeHeroLibrary(liveHero: string, library: string[]): string[] {
   if (library.length > 0) return library;
   return liveHero ? [liveHero] : [];
 }
+
+type ImageMeta = {
+  fileName: string;
+  width: number;
+  height: number;
+  aspectRatio: string;
+  orientation: string;
+  megapixels: string;
+  fileSize: string | null;
+  format: string | null;
+};
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+function formatAspectRatio(width: number, height: number): string {
+  const divisor = gcd(width, height);
+  const w = width / divisor;
+  const h = height / divisor;
+  const decimal = (width / height).toFixed(2);
+  if (w <= 20 && h <= 20) return `${w}:${h} (${decimal}:1)`;
+  return `${decimal}:1`;
+}
+
+function getOrientation(width: number, height: number): string {
+  if (width === height) return "Square";
+  return width > height ? "Landscape" : "Portrait";
+}
+
+function getFileNameFromUrl(url: string): string {
+  try {
+    const path = new URL(url).pathname;
+    return decodeURIComponent(path.split("/").pop() || url);
+  } catch {
+    return url.split("/").pop() || url;
+  }
+}
+
+function getFormatFromUrl(url: string): string | null {
+  const name = getFileNameFromUrl(url).toLowerCase();
+  const match = name.match(/\.(jpe?g|png|gif|webp|svg|avif|bmp)$/);
+  return match ? match[1].toUpperCase() : null;
+}
+
+async function loadImageMeta(url: string): Promise<ImageMeta> {
+  const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = url;
+  });
+
+  let fileSize: string | null = null;
+  try {
+    const res = await fetch(url, { method: "HEAD" });
+    const len = res.headers.get("content-length");
+    if (len) fileSize = formatFileSize(Number(len));
+  } catch {
+  }
+
+  if (!fileSize) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      fileSize = formatFileSize(blob.size);
+    } catch {
+    }
+  }
+
+  return {
+    fileName: getFileNameFromUrl(url),
+    width,
+    height,
+    aspectRatio: formatAspectRatio(width, height),
+    orientation: getOrientation(width, height),
+    megapixels: ((width * height) / 1_000_000).toFixed(2),
+    fileSize,
+    format: getFormatFromUrl(url),
+  };
+}
+
+// ─── Welcome card sections (admin order) ─────────────────────────────────────
+const WELCOME_CARD_SECTIONS = [
+  { suffix: "1", label: "Welcome Card 1", uploadLabel: "Card 1 Image" },
+  { suffix: "2", label: "Welcome Card 2", uploadLabel: "Card 2 Image" },
+  { suffix: "3", label: "Welcome Card 3", uploadLabel: "Card 3 Image" },
+  { suffix: "4_0", label: "Welcome Card 4.0", uploadLabel: "Card 4.0 Image" },
+  { suffix: "4", label: "Welcome Card 4", uploadLabel: "Card 4 Image" },
+] as const;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AdminHomepagePage() {
@@ -79,6 +248,10 @@ export default function AdminHomepagePage() {
     welcomeCard3Title: "Events & Celebrations",
     welcomeCard3Subtitle: "Memorable Moments",
     welcomeCard3Image: "",
+
+    welcomeCard4_0Title: "Romantic Dinner",
+    welcomeCard4_0Subtitle: "An Evening Made for Two",
+    welcomeCard4_0Image: "",
 
     welcomeCard4Title: "Prime Location",
     welcomeCard4Subtitle: "Candolim, North Goa",
@@ -119,6 +292,16 @@ export default function AdminHomepagePage() {
   const [preview, setPreview] = useState<Record<string, string>>({});
   const [heroImages, setHeroImages] = useState<string[]>([]);
   const [heroUploading, setHeroUploading] = useState(false);
+  const [viewingImage, setViewingImage] = useState<{ url: string; label: string } | null>(null);
+  const [imageDetails, setImageDetails] = useState<{
+    url: string;
+    label: string;
+    loading: boolean;
+    meta: ImageMeta | null;
+    error: string | null;
+  } | null>(null);
+  const [savedImages, setSavedImages] = useState<Record<UploadField, string>>(EMPTY_SAVED_IMAGES);
+  const [savingImageField, setSavingImageField] = useState<UploadField | null>(null);
 
   // ── Load existing data ───────────────────────────────────────────────────────
   const loadHomepage = async (isActive: () => boolean = () => true) => {
@@ -157,6 +340,10 @@ export default function AdminHomepagePage() {
         welcomeCard3Subtitle: data.welcome_card_3_subtitle || prev.welcomeCard3Subtitle,
         welcomeCard3Image: data.welcome_card_3_image || prev.welcomeCard3Image,
 
+        welcomeCard4_0Title: data.welcome_card_4_0_title || prev.welcomeCard4_0Title,
+        welcomeCard4_0Subtitle: data.welcome_card_4_0_subtitle || prev.welcomeCard4_0Subtitle,
+        welcomeCard4_0Image: data.welcome_card_4_0_image || prev.welcomeCard4_0Image,
+
         welcomeCard4Title: data.welcome_card_4_title || prev.welcomeCard4Title,
         welcomeCard4Subtitle: data.welcome_card_4_subtitle || prev.welcomeCard4Subtitle,
         welcomeCard4Image: data.welcome_card_4_image || prev.welcomeCard4Image,
@@ -192,6 +379,7 @@ export default function AdminHomepagePage() {
         offering3Subtitle: data.offering_3_subtitle || prev.offering3Subtitle,
         offering3Image: data.offering_3_image || prev.offering3Image,
       }));
+      setSavedImages(savedImagesFromData(data));
     } catch (error) {
       console.error(error);
     }
@@ -243,9 +431,69 @@ export default function AdminHomepagePage() {
 
       setPreview((prev) => ({ ...prev, [field]: publicUrl }));
       setFormData((prev) => ({ ...prev, [field]: publicUrl }));
-      setSaveMessage("Image uploaded — click Save to apply.");
+      setSaveMessage("Image uploaded — click Save to confirm this image.");
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const handleImageRemove = (field: UploadField) => {
+    setFormData((prev) => ({ ...prev, [field]: "" }));
+    setPreview((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+    setSaveMessage("Image removed — click Save to confirm this image.");
+  };
+
+  const handleImageSave = async (field: UploadField, label: string) => {
+    const column = UPLOAD_FIELD_COLUMNS[field];
+    const value = formData[field];
+
+    try {
+      setSavingImageField(field);
+      setSaveMessage("");
+
+      const { error } = await supabase.from("homepage_content").upsert({
+        id: "00000000-0000-0000-0000-000000000001",
+        [column]: value,
+      });
+
+      if (error) {
+        console.error(error);
+        alert(error.message);
+        return;
+      }
+
+      setSavedImages((prev) => ({ ...prev, [field]: value }));
+      setPreview((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+      setSaveMessage(`${label} saved successfully`);
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong");
+    } finally {
+      setSavingImageField(null);
+    }
+  };
+
+  const openImageDetails = async (url: string, label: string) => {
+    setImageDetails({ url, label, loading: true, meta: null, error: null });
+    try {
+      const meta = await loadImageMeta(url);
+      setImageDetails({ url, label, loading: false, meta, error: null });
+    } catch {
+      setImageDetails({
+        url,
+        label,
+        loading: false,
+        meta: null,
+        error: "Could not load image details.",
+      });
     }
   };
 
@@ -337,6 +585,10 @@ export default function AdminHomepagePage() {
         welcome_card_3_subtitle: formData.welcomeCard3Subtitle,
         welcome_card_3_image: formData.welcomeCard3Image,
 
+        welcome_card_4_0_title: formData.welcomeCard4_0Title,
+        welcome_card_4_0_subtitle: formData.welcomeCard4_0Subtitle,
+        welcome_card_4_0_image: formData.welcomeCard4_0Image,
+
         welcome_card_4_title: formData.welcomeCard4Title,
         welcome_card_4_subtitle: formData.welcomeCard4Subtitle,
         welcome_card_4_image: formData.welcomeCard4Image,
@@ -377,6 +629,7 @@ export default function AdminHomepagePage() {
 
       setSaveMessage("Homepage saved successfully");
       setHeroImages(libraryToSave);
+      setSavedImages(savedImagesFromFormData(formData));
       await loadHomepage();
     } catch (error) {
       console.error(error);
@@ -465,34 +718,102 @@ export default function AdminHomepagePage() {
     </div>
   );
 
-  const UploadBox = ({ field, label }: { field: UploadField; label: string }) => (
-    <div className="space-y-3">
-      <label className="text-sm font-medium">{label}</label>
-      <label className="border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-muted/40 transition-colors">
-        <ImagePlus className="size-8 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">Click to upload image</span>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => handleImageUpload(e, field)}
-          className="hidden"
-        />
-      </label>
-      {(preview[field] || (formData as Record<string, string>)[field]) && (
-        <div className="space-y-2">
-          <img
-            src={preview[field] || (formData as Record<string, string>)[field]}
-            alt="Preview"
-            className="w-full h-64 object-cover rounded-2xl border"
+  const UploadBox = ({ field, label }: { field: UploadField; label: string }) => {
+    const currentValue = formData[field];
+    const savedValue = savedImages[field];
+    const hasUnsavedChanges = currentValue !== savedValue;
+    const imageUrl = preview[field] || currentValue;
+    const isSaving = savingImageField === field;
+
+    return (
+      <div className="space-y-3">
+        <label className="text-sm font-medium">{label}</label>
+        <label className="border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-muted/40 transition-colors">
+          <ImagePlus className="size-8 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Click to upload image</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleImageUpload(e, field)}
+            className="hidden"
           />
-          <div className="flex items-center gap-2 text-sm text-green-600">
-            <CheckCircle2 className="size-4" />
-            Image uploaded
+        </label>
+        {imageUrl && (
+          <div className="space-y-2">
+            <img
+              src={imageUrl}
+              alt="Preview"
+              className="w-full h-64 object-cover rounded-2xl border"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setViewingImage({ url: imageUrl, label })}
+              >
+                <Eye className="size-4" />
+                View
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void openImageDetails(imageUrl, label)}
+              >
+                <Info className="size-4" />
+                Details
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => handleImageRemove(field)}
+              >
+                <Trash2 className="size-4" />
+                Delete
+              </Button>
+              {hasUnsavedChanges && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void handleImageSave(field, label)}
+                  disabled={isSaving}
+                >
+                  {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                  {isSaving ? "Saving…" : "Save"}
+                </Button>
+              )}
+              {!hasUnsavedChanges && imageUrl && (
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <CheckCircle2 className="size-4" />
+                  Image saved
+                </div>
+              )}
+              {hasUnsavedChanges && (
+                <span className="text-sm text-amber-600">Unsaved changes</span>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        )}
+        {!imageUrl && hasUnsavedChanges && (
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-dashed p-4">
+            <span className="text-sm text-muted-foreground">Image removed</span>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void handleImageSave(field, label)}
+              disabled={isSaving}
+            >
+              {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {isSaving ? "Saving…" : "Save"}
+            </Button>
+            <span className="text-sm text-amber-600">Unsaved changes</span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -567,16 +888,16 @@ export default function AdminHomepagePage() {
       </div>
 
       {/* WELCOME CARDS */}
-      {([1, 2, 3, 4] as const).map((i) => (
-        <div key={i} className="rounded-2xl border bg-background p-6 space-y-5">
-          <h2 className="text-xl font-semibold">Welcome Card {i}</h2>
+      {WELCOME_CARD_SECTIONS.map(({ suffix, label, uploadLabel }) => (
+        <div key={suffix} className="rounded-2xl border bg-background p-6 space-y-5">
+          <h2 className="text-xl font-semibold">{label}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-sm font-medium">Title</label>
               <input
                 type="text"
-                name={`welcomeCard${i}Title`}
-                value={(formData as Record<string, string>)[`welcomeCard${i}Title`]}
+                name={`welcomeCard${suffix}Title`}
+                value={(formData as Record<string, string>)[`welcomeCard${suffix}Title`]}
                 onChange={handleChange}
                 className="w-full h-12 rounded-xl border px-4 bg-background"
               />
@@ -585,14 +906,17 @@ export default function AdminHomepagePage() {
               <label className="text-sm font-medium">Subtitle</label>
               <input
                 type="text"
-                name={`welcomeCard${i}Subtitle`}
-                value={(formData as Record<string, string>)[`welcomeCard${i}Subtitle`]}
+                name={`welcomeCard${suffix}Subtitle`}
+                value={(formData as Record<string, string>)[`welcomeCard${suffix}Subtitle`]}
                 onChange={handleChange}
                 className="w-full h-12 rounded-xl border px-4 bg-background"
               />
             </div>
           </div>
-          <UploadBox field={`welcomeCard${i}Image` as UploadField} label={`Card ${i} Image`} />
+          <UploadBox
+            field={`welcomeCard${suffix}Image` as UploadField}
+            label={uploadLabel}
+          />
         </div>
       ))}
 
@@ -725,6 +1049,99 @@ export default function AdminHomepagePage() {
           </div>
         )}
       </div>
+
+      {viewingImage && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5">
+          <div className="w-full max-w-5xl rounded-3xl bg-background border max-h-[92vh] overflow-y-auto">
+            <div className="sticky top-0 bg-background border-b p-5 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">{viewingImage.label}</h2>
+              <button
+                type="button"
+                onClick={() => setViewingImage(null)}
+                className="size-10 rounded-xl border flex items-center justify-center"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="p-6">
+              <img
+                src={viewingImage.url}
+                alt={viewingImage.label}
+                className="w-full max-h-[70vh] object-contain rounded-2xl border"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {imageDetails && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5">
+          <div className="w-full max-w-lg rounded-3xl bg-background border max-h-[92vh] overflow-y-auto">
+            <div className="sticky top-0 bg-background border-b p-5 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Image Details</h2>
+              <button
+                type="button"
+                onClick={() => setImageDetails(null)}
+                className="size-10 rounded-xl border flex items-center justify-center"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              <div>
+                <p className="text-sm text-muted-foreground">{imageDetails.label}</p>
+                <img
+                  src={imageDetails.url}
+                  alt={imageDetails.label}
+                  className="mt-3 w-full h-40 object-cover rounded-2xl border"
+                />
+              </div>
+
+              {imageDetails.loading ? (
+                <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading details…
+                </div>
+              ) : imageDetails.error ? (
+                <p className="text-sm text-destructive">{imageDetails.error}</p>
+              ) : imageDetails.meta ? (
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-1">
+                    <dt className="text-muted-foreground">File name</dt>
+                    <dd className="font-medium break-all">{imageDetails.meta.fileName}</dd>
+                  </div>
+                  <div className="space-y-1">
+                    <dt className="text-muted-foreground">Format</dt>
+                    <dd className="font-medium">{imageDetails.meta.format ?? "Unknown"}</dd>
+                  </div>
+                  <div className="space-y-1">
+                    <dt className="text-muted-foreground">Dimensions</dt>
+                    <dd className="font-medium">
+                      {imageDetails.meta.width} × {imageDetails.meta.height} px
+                    </dd>
+                  </div>
+                  <div className="space-y-1">
+                    <dt className="text-muted-foreground">Aspect ratio</dt>
+                    <dd className="font-medium">{imageDetails.meta.aspectRatio}</dd>
+                  </div>
+                  <div className="space-y-1">
+                    <dt className="text-muted-foreground">Orientation</dt>
+                    <dd className="font-medium">{imageDetails.meta.orientation}</dd>
+                  </div>
+                  <div className="space-y-1">
+                    <dt className="text-muted-foreground">Resolution</dt>
+                    <dd className="font-medium">{imageDetails.meta.megapixels} MP</dd>
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <dt className="text-muted-foreground">File size</dt>
+                    <dd className="font-medium">{imageDetails.meta.fileSize ?? "Unavailable"}</dd>
+                  </div>
+                </dl>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

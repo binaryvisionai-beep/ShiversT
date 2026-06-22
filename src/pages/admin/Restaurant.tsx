@@ -26,6 +26,8 @@ import {
   ToggleRight,
   Pencil,
   Check,
+  Info,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,6 +50,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { type ImageMeta, loadImageMeta, loadImageMetaFromFile } from "@/lib/image-utils";
 import type { DateRangePreset } from "@/lib/bookings/types";
 import { mapDbRowToReservation } from "@/lib/reservations/map-reservation";
 import { RESTAURANT_TABLES, ZONE_LABELS } from "@/lib/reservations/tables";
@@ -74,6 +77,7 @@ const CMS_GROUPS = [
   {
     key: "goan",
     label: "Goan Cuisine",
+    sizeHint: "Best size: 1200 × 900 px",
     fields: [
       { key: "goan_image_1", label: "Goan 1" },
       { key: "goan_image_2", label: "Goan 2" },
@@ -89,6 +93,7 @@ const CMS_GROUPS = [
   {
     key: "oriental",
     label: "Oriental Cuisine",
+    sizeHint: "Best size: 1200 × 900 px",
     fields: [
       { key: "oriental_image_1", label: "Oriental 1" },
       { key: "oriental_image_2", label: "Oriental 2" },
@@ -104,6 +109,7 @@ const CMS_GROUPS = [
   {
     key: "northeast",
     label: "Northeast Cuisine",
+    sizeHint: "Best size: 1200 × 900 px",
     fields: [
       { key: "northeast_image_1", label: "NE 1" },
       { key: "northeast_image_2", label: "NE 2" },
@@ -119,6 +125,7 @@ const CMS_GROUPS = [
   {
     key: "continental",
     label: "Continental Cuisine",
+    sizeHint: "Best size: 1200 × 900 px",
     fields: [
       { key: "continental_image_1", label: "Continental 1" },
       { key: "continental_image_2", label: "Continental 2" },
@@ -315,6 +322,138 @@ function ReservationCard({ row, mapped, selected, onSelect }: {
   );
 }
 
+type ImageDetailsData = {
+  url: string;
+  label: string;
+  loading: boolean;
+  meta: ImageMeta | null;
+  error: string | null;
+};
+
+function ImageDetailsModal({
+  details,
+  onClose,
+}: {
+  details: ImageDetailsData;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5">
+      <div className="w-full max-w-lg rounded-3xl bg-background border max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-background border-b p-5 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Image Details</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="size-10 rounded-xl border flex items-center justify-center"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="p-6 space-y-5">
+          <div>
+            <p className="text-sm text-muted-foreground">{details.label}</p>
+            <img
+              src={details.url}
+              alt={details.label}
+              className="mt-3 w-full h-40 object-cover rounded-2xl border"
+            />
+          </div>
+
+          {details.loading ? (
+            <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Loading details…
+            </div>
+          ) : details.error ? (
+            <p className="text-sm text-destructive">{details.error}</p>
+          ) : details.meta ? (
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div className="space-y-1">
+                <dt className="text-muted-foreground">File name</dt>
+                <dd className="font-medium break-all">{details.meta.fileName}</dd>
+              </div>
+              <div className="space-y-1">
+                <dt className="text-muted-foreground">Format</dt>
+                <dd className="font-medium">{details.meta.format ?? "Unknown"}</dd>
+              </div>
+              <div className="space-y-1">
+                <dt className="text-muted-foreground">Dimensions</dt>
+                <dd className="font-medium">
+                  {details.meta.width} × {details.meta.height} px
+                </dd>
+              </div>
+              <div className="space-y-1">
+                <dt className="text-muted-foreground">Aspect ratio</dt>
+                <dd className="font-medium">{details.meta.aspectRatio}</dd>
+              </div>
+              <div className="space-y-1">
+                <dt className="text-muted-foreground">Orientation</dt>
+                <dd className="font-medium">{details.meta.orientation}</dd>
+              </div>
+              <div className="space-y-1">
+                <dt className="text-muted-foreground">Resolution</dt>
+                <dd className="font-medium">{details.meta.megapixels} MP</dd>
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <dt className="text-muted-foreground">File size</dt>
+                <dd className="font-medium">{details.meta.fileSize ?? "Unavailable"}</dd>
+              </div>
+            </dl>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useImageDetails() {
+  const [imageDetails, setImageDetails] = useState<ImageDetailsData | null>(null);
+
+  const openImageDetails = async (source: string | File, label: string) => {
+    if (typeof source === "string") {
+      setImageDetails({ url: source, label, loading: true, meta: null, error: null });
+      try {
+        const meta = await loadImageMeta(source);
+        setImageDetails({ url: source, label, loading: false, meta, error: null });
+      } catch {
+        setImageDetails({
+          url: source,
+          label,
+          loading: false,
+          meta: null,
+          error: "Could not load image details.",
+        });
+      }
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(source);
+    setImageDetails({ url: previewUrl, label, loading: true, meta: null, error: null });
+    try {
+      const meta = await loadImageMetaFromFile(source);
+      setImageDetails({ url: previewUrl, label, loading: false, meta, error: null });
+    } catch {
+      setImageDetails({
+        url: previewUrl,
+        label,
+        loading: false,
+        meta: null,
+        error: "Could not load image details.",
+      });
+    }
+  };
+
+  const closeImageDetails = () => {
+    if (imageDetails?.url.startsWith("blob:")) {
+      URL.revokeObjectURL(imageDetails.url);
+    }
+    setImageDetails(null);
+  };
+
+  return { imageDetails, openImageDetails, closeImageDetails };
+}
+
 // ─── Signature Dishes Manager ─────────────────────────────────────────────────
 type SignatureDish = { id: string; name: string; image_url: string; sort_order: number };
 
@@ -327,6 +466,7 @@ function SignatureDishesManager() {
   const [newPreview, setNewPreview] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const { imageDetails, openImageDetails, closeImageDetails } = useImageDetails();
 
   useEffect(() => {
     const load = async () => {
@@ -435,7 +575,21 @@ function SignatureDishesManager() {
           </Button>
         </div>
         {newPreview && (
-          <img src={newPreview} alt="preview" className="h-20 w-auto rounded-lg border border-border object-cover" />
+          <div className="space-y-2">
+            <div className="relative inline-block">
+              <img src={newPreview} alt="preview" className="h-20 w-auto rounded-lg border border-border object-cover" />
+              {newFile && (
+                <button
+                  type="button"
+                  onClick={() => void openImageDetails(newFile, newName.trim() || "New dish preview")}
+                  className="absolute top-1 right-1 p-1 rounded-md bg-background/90 border border-border shadow-sm hover:bg-muted transition-colors"
+                  title="Image details"
+                >
+                  <Info className="size-3 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
@@ -451,11 +605,21 @@ function SignatureDishesManager() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {dishes.map((dish) => (
               <div key={dish.id} className="relative rounded-xl border border-border overflow-hidden group">
-                <img
-                  src={dish.image_url}
-                  alt={dish.name}
-                  className="w-full h-28 object-cover"
-                />
+                <div className="relative">
+                  <img
+                    src={dish.image_url}
+                    alt={dish.name}
+                    className="w-full h-28 object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void openImageDetails(dish.image_url, dish.name)}
+                    className="absolute top-1.5 right-1.5 p-1 rounded-md bg-background/90 border border-border shadow-sm hover:bg-muted transition-colors"
+                    title="Image details"
+                  >
+                    <Info className="size-3 text-muted-foreground" />
+                  </button>
+                </div>
                 <div className="p-2 bg-card">
                   {editingId === dish.id ? (
                     <div className="flex gap-1">
@@ -496,6 +660,10 @@ function SignatureDishesManager() {
           </div>
         )}
       </div>
+
+      {imageDetails && (
+        <ImageDetailsModal details={imageDetails} onClose={closeImageDetails} />
+      )}
     </div>
   );
 }
@@ -700,10 +868,13 @@ function SeatingSectionsManager() {
 // ─── CMS Image + Text Manager ─────────────────────────────────────────────────
 function CmsImageManager() {
   const [cmsData, setCmsData] = useState<Record<string, string>>({});
+  const [savedImages, setSavedImages] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [savingField, setSavingField] = useState<string | null>(null);
   const [loading, setCmsLoading] = useState(true);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ hero: true });
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const { imageDetails, openImageDetails, closeImageDetails } = useImageDetails();
 
   useEffect(() => {
     const load = async () => {
@@ -712,7 +883,17 @@ function CmsImageManager() {
         .select("*")
         .eq("id", CMS_ROW_ID)
         .single();
-      if (data) setCmsData(data as Record<string, string>);
+      if (data) {
+        const record = data as Record<string, string>;
+        setCmsData(record);
+        const saved: Record<string, string> = {};
+        for (const group of CMS_GROUPS) {
+          for (const field of group.fields) {
+            saved[field.key] = (record[field.key] as string) ?? "";
+          }
+        }
+        setSavedImages(saved);
+      }
       setCmsLoading(false);
     };
     void load();
@@ -735,7 +916,7 @@ function CmsImageManager() {
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from("restaurant").getPublicUrl(path);
       handleUrlChange(field, urlData.publicUrl);
-      toast.success("Image uploaded");
+      toast.success("Image uploaded — click Save to confirm");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -751,12 +932,42 @@ function CmsImageManager() {
         .update({ ...cmsData, updated_at: new Date().toISOString() })
         .eq("id", CMS_ROW_ID);
       if (error) throw error;
+      const saved: Record<string, string> = {};
+      for (const group of CMS_GROUPS) {
+        for (const field of group.fields) {
+          saved[field.key] = (cmsData[field.key] as string) ?? "";
+        }
+      }
+      setSavedImages(saved);
       toast.success("Restaurant content saved");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleImageSave = async (field: string, label: string) => {
+    setSavingField(field);
+    try {
+      const value = (cmsData[field] as string) ?? "";
+      const { error } = await supabase
+        .from("restaurant_content")
+        .update({ [field]: value, updated_at: new Date().toISOString() })
+        .eq("id", CMS_ROW_ID);
+      if (error) throw error;
+      setSavedImages((prev) => ({ ...prev, [field]: value }));
+      toast.success(`${label} saved`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  const handleImageDelete = (field: string) => {
+    handleUrlChange(field, "");
+    toast.info("Image removed — click Save to confirm");
   };
 
   if (loading)
@@ -786,7 +997,14 @@ function CmsImageManager() {
               onClick={() => toggleGroup(group.key)}
               className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-muted/30 transition-colors"
             >
-              <span className="text-sm font-medium">{group.label}</span>
+              <span className="flex items-center gap-2 flex-wrap min-w-0">
+                {"sizeHint" in group && group.sizeHint && (
+                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400 shrink-0">
+                    {group.sizeHint}
+                  </span>
+                )}
+                <span className="text-sm font-medium">{group.label}</span>
+              </span>
               {openGroups[group.key]
                 ? <ChevronUp className="size-4 text-muted-foreground" />
                 : <ChevronDown className="size-4 text-muted-foreground" />}
@@ -833,13 +1051,19 @@ function CmsImageManager() {
 
                     {/* Image fields */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                      {group.fields.map(({ key, label }) => (
+                      {group.fields.map(({ key, label }) => {
+                        const imageUrl = (cmsData[key] as string) ?? "";
+                        const savedValue = savedImages[key] ?? "";
+                        const hasUnsavedChanges = imageUrl !== savedValue;
+                        const isSaving = savingField === key;
+
+                        return (
                         <div key={key} className="space-y-1.5">
                           <Label className="text-xs text-muted-foreground">{label}</Label>
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              value={(cmsData[key] as string) ?? ""}
+                              value={imageUrl}
                               onChange={(e) => handleUrlChange(key, e.target.value)}
                               placeholder="Paste image URL..."
                               className="flex-1 h-9 px-3 rounded-lg border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 min-w-0"
@@ -862,15 +1086,82 @@ function CmsImageManager() {
                               </span>
                             </label>
                           </div>
-                          {(cmsData[key] as string) && (
-                            <img
-                              src={cmsData[key] as string}
-                              alt={label}
-                              className="h-16 w-full object-cover rounded-lg border border-border"
-                            />
+                          {imageUrl && (
+                            <div className="space-y-2">
+                              <img
+                                src={imageUrl}
+                                alt={label}
+                                className="h-16 w-full object-cover rounded-lg border border-border"
+                              />
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1 text-xs rounded-lg"
+                                  onClick={() =>
+                                    void openImageDetails(imageUrl, `${group.label} — ${label}`)
+                                  }
+                                >
+                                  <Info className="size-3" />
+                                  View details
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  className="h-8 gap-1 text-xs rounded-lg"
+                                  onClick={() => handleImageDelete(key)}
+                                >
+                                  <Trash2 className="size-3" />
+                                  Delete
+                                </Button>
+                                {hasUnsavedChanges && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-8 gap-1 text-xs rounded-lg"
+                                    onClick={() => void handleImageSave(key, label)}
+                                    disabled={isSaving}
+                                  >
+                                    {isSaving
+                                      ? <Loader2 className="size-3 animate-spin" />
+                                      : <Save className="size-3" />}
+                                    {isSaving ? "Saving…" : "Save"}
+                                  </Button>
+                                )}
+                                {!hasUnsavedChanges && (
+                                  <span className="flex items-center gap-1 text-xs text-green-600">
+                                    <CheckCircle2 className="size-3" />
+                                    Saved
+                                  </span>
+                                )}
+                                {hasUnsavedChanges && (
+                                  <span className="text-xs text-amber-600">Unsaved changes</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {!imageUrl && hasUnsavedChanges && (
+                            <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed p-3">
+                              <span className="text-xs text-muted-foreground">Image removed</span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-8 gap-1 text-xs rounded-lg"
+                                onClick={() => void handleImageSave(key, label)}
+                                disabled={isSaving}
+                              >
+                                {isSaving
+                                  ? <Loader2 className="size-3 animate-spin" />
+                                  : <Save className="size-3" />}
+                                {isSaving ? "Saving…" : "Save"}
+                              </Button>
+                            </div>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </motion.div>
@@ -879,6 +1170,10 @@ function CmsImageManager() {
           </div>
         ))}
       </div>
+
+      {imageDetails && (
+        <ImageDetailsModal details={imageDetails} onClose={closeImageDetails} />
+      )}
     </div>
   );
 }

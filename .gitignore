@@ -14,19 +14,61 @@ dist-ssr
 .vinxi
 .tanstack/**
 .nitro
+dev-dist
 *.local
 
 # Environment & secrets
 .env
 .env.*
 !.env.example
+.envrc
+*.env
 *.pem
 *.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+*.secret
+*.token
 credentials.json
+*.credentials.json
+secrets.json
+secrets.yaml
+secrets.yml
+service-account*.json
+serviceAccountKey*.json
+firebase-adminsdk*.json
+.npmrc
+.netrc
+.doppler.yaml
+.doppler/
+.aws/credentials
+.aws/config
+.sentryclirc
+.cursor/mcp.json
+
+# Supabase CLI
+supabase/.env
+supabase/.env.*
+supabase/.temp/
+.branches/
 
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+.dev.vars.*
+.mf/
+wrangler.toml.local
+wrangler.jsonc.local
+
+# SSH / keys
+id_rsa
+id_ed25519
+id_ecdsa
+*.ppk
 
 # Editor directories and files
 .vscode/*
@@ -38,6 +80,3 @@ credentials.json
 *.njsproj
 *.sln
 *.sw?
-supabase/.temp/
-.env
-.env.*
