@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Loader2,
@@ -9,6 +9,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { REVIEW_SECTIONS, REVIEW_SETTINGS_IDS, DEFAULT_GOOGLE_MAP_URLS, type ReviewSection } from "@/lib/review-sections";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -21,10 +22,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
-
 type GoogleSettings = {
   id: string;
+  section: ReviewSection;
   section_heading: string;
   average_rating: number;
   review_count_label: string;
@@ -37,22 +37,35 @@ type WebsiteReview = {
   guest_name: string;
   rating: number;
   comment: string;
+  section: ReviewSection;
   created_at: string;
 };
 
-const defaultGoogleSettings: GoogleSettings = {
-  id: SETTINGS_ID,
-  section_heading: "What Our Guests Say",
-  average_rating: 4.7,
-  review_count_label: "Based on 1000+ reviews",
-  google_profile_url: null,
-  updated_at: new Date().toISOString(),
-};
+function defaultGoogleSettingsFor(section: ReviewSection): GoogleSettings {
+  return {
+    id: REVIEW_SETTINGS_IDS[section],
+    section,
+    section_heading: "What Our Guests Say",
+    average_rating: section === "restaurant" ? 4.7 : 5,
+    review_count_label: section === "restaurant" ? "Based on 1000+ reviews" : "",
+    google_profile_url: DEFAULT_GOOGLE_MAP_URLS[section],
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function emptyGoogleBySection(): Record<ReviewSection, GoogleSettings> {
+  return {
+    restaurant: defaultGoogleSettingsFor("restaurant"),
+    rooms: defaultGoogleSettingsFor("rooms"),
+    tiffin: defaultGoogleSettingsFor("tiffin"),
+  };
+}
 
 const emptyReviewForm = {
   guest_name: "",
   rating: 5,
   comment: "",
+  section: "restaurant" as ReviewSection,
 };
 
 function StarRating({ value, size = "sm" }: { value: number; size?: "sm" | "lg" }) {
@@ -84,8 +97,13 @@ function StarRating({ value, size = "sm" }: { value: number; size?: "sm" | "lg" 
   );
 }
 
+function sectionLabel(section: ReviewSection): string {
+  return REVIEW_SECTIONS.find((s) => s.id === section)?.label ?? section;
+}
+
 export default function ReviewsPage() {
-  const [googleSettings, setGoogleSettings] = useState<GoogleSettings>(defaultGoogleSettings);
+  const [activeSection, setActiveSection] = useState<ReviewSection>("restaurant");
+  const [googleBySection, setGoogleBySection] = useState(emptyGoogleBySection);
   const [reviews, setReviews] = useState<WebsiteReview[]>([]);
   const [loadingGoogle, setLoadingGoogle] = useState(true);
   const [loadingReviews, setLoadingReviews] = useState(true);
@@ -104,22 +122,39 @@ export default function ReviewsPage() {
     loadReviews();
   }, []);
 
+  const sectionReviews = useMemo(
+    () => reviews.filter((review) => review.section === activeSection),
+    [reviews, activeSection],
+  );
+
+  const activeGoogleSettings = googleBySection[activeSection];
+
   const loadGoogleSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from("google_review_settings")
-        .select("*")
-        .eq("id", SETTINGS_ID)
-        .maybeSingle();
+      const { data, error } = await supabase.from("google_review_settings").select("*");
 
       if (error) {
         console.error(error);
         return;
       }
-      if (data) {
-        setGoogleSettings({
-          ...data,
-          average_rating: Number(data.average_rating),
+
+      if (data?.length) {
+        setGoogleBySection((prev) => {
+          const next = { ...prev };
+          for (const row of data) {
+            const section = (row.section || "restaurant") as ReviewSection;
+            if (!REVIEW_SECTIONS.some((s) => s.id === section)) continue;
+            next[section] = {
+              id: row.id,
+              section,
+              section_heading: row.section_heading ?? next[section].section_heading,
+              average_rating: Number(row.average_rating ?? next[section].average_rating),
+              review_count_label: row.review_count_label ?? next[section].review_count_label,
+              google_profile_url: row.google_profile_url ?? next[section].google_profile_url,
+              updated_at: row.updated_at ?? next[section].updated_at,
+            };
+          }
+          return next;
         });
       }
     } catch (error) {
@@ -133,7 +168,7 @@ export default function ReviewsPage() {
     try {
       const { data, error } = await supabase
         .from("website_reviews")
-        .select("id, guest_name, rating, comment, created_at")
+        .select("id, guest_name, rating, comment, section, created_at")
         .eq("status", "approved")
         .order("created_at", { ascending: false });
 
@@ -141,7 +176,12 @@ export default function ReviewsPage() {
         console.error(error);
         return;
       }
-      setReviews((data as WebsiteReview[]) || []);
+      setReviews(
+        ((data as WebsiteReview[]) || []).map((review) => ({
+          ...review,
+          section: (review.section || "restaurant") as ReviewSection,
+        })),
+      );
     } catch (error) {
       console.error(error);
     } finally {
@@ -153,19 +193,24 @@ export default function ReviewsPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setGoogleSettings((prev) => ({
+    setGoogleBySection((prev) => ({
       ...prev,
-      [name]: name === "average_rating" ? parseFloat(value) || 0 : value,
+      [activeSection]: {
+        ...prev[activeSection],
+        [name]: name === "average_rating" ? parseFloat(value) || 0 : value,
+      },
     }));
   };
 
   const saveGoogleSettings = async () => {
+    const googleSettings = googleBySection[activeSection];
     try {
       setSavingGoogle(true);
       setGoogleMessage("");
 
       const { error } = await supabase.from("google_review_settings").upsert({
-        id: SETTINGS_ID,
+        id: googleSettings.id,
+        section: activeSection,
         section_heading: googleSettings.section_heading,
         average_rating: Math.min(5, Math.max(0, googleSettings.average_rating)),
         review_count_label: googleSettings.review_count_label,
@@ -192,12 +237,12 @@ export default function ReviewsPage() {
   const closeReviewModal = () => {
     setReviewModalOpen(false);
     setEditingReview(null);
-    setReviewForm(emptyReviewForm);
+    setReviewForm({ ...emptyReviewForm, section: activeSection });
   };
 
   const openAddReview = () => {
     setEditingReview(null);
-    setReviewForm(emptyReviewForm);
+    setReviewForm({ ...emptyReviewForm, section: activeSection });
     setReviewModalOpen(true);
   };
 
@@ -207,6 +252,7 @@ export default function ReviewsPage() {
       guest_name: review.guest_name,
       rating: review.rating,
       comment: review.comment,
+      section: review.section,
     });
     setReviewModalOpen(true);
   };
@@ -221,6 +267,7 @@ export default function ReviewsPage() {
       guest_name: reviewForm.guest_name.trim(),
       rating: reviewForm.rating,
       comment: reviewForm.comment.trim(),
+      section: reviewForm.section,
       status: "approved" as const,
     };
 
@@ -236,7 +283,7 @@ export default function ReviewsPage() {
 
         if (error) {
           console.error(error);
-          alert("Failed to update review");
+          alert(error.message || "Failed to update review");
           return;
         }
         setReviewMessage("Review updated");
@@ -245,7 +292,7 @@ export default function ReviewsPage() {
 
         if (error) {
           console.error(error);
-          alert("Failed to add review");
+          alert(error.message || "Failed to add review");
           return;
         }
         setReviewMessage("Review added");
@@ -290,77 +337,168 @@ export default function ReviewsPage() {
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Content</p>
         <h1 className="font-display text-3xl md:text-4xl mt-1">Reviews</h1>
         <p className="text-sm text-muted-foreground mt-2">
-          Manage the Google summary and paste website reviews — they publish on the main site
-          immediately.
+          Manage testimonials separately for Restaurant, Rooms Oasis, and Northeast Tiffin Box.
+          Each section publishes on its own page on the main site.
         </p>
       </div>
 
-      {/* Google Review Summary */}
-      <section className="rounded-3xl border bg-background p-6 md:p-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold">Google Review Summary</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              These values appear in the &quot;What Our Guests Say&quot; block on the main site.
-            </p>
+      <div className="flex flex-wrap gap-2">
+        {REVIEW_SECTIONS.map((section) => {
+          const count = reviews.filter((r) => r.section === section.id).length;
+          const active = activeSection === section.id;
+          return (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => setActiveSection(section.id)}
+              className={`rounded-2xl border px-4 py-2.5 text-sm font-medium transition-colors ${
+                active
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "bg-background hover:bg-muted"
+              }`}
+            >
+              {section.label}
+              <span className="ml-2 text-xs opacity-80">({count})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {activeSection === "restaurant" && (
+        <section className="rounded-3xl border bg-background p-6 md:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold">Google Review Summary</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Used on the Restaurant page and homepage testimonials block.
+              </p>
+            </div>
+            {googleMessage && (
+              <div className="flex items-center gap-2 text-sm text-green-600">
+                <CheckCircle2 className="size-4" /> {googleMessage}
+              </div>
+            )}
           </div>
-          {googleMessage && (
-            <div className="flex items-center gap-2 text-sm text-green-600">
-              <CheckCircle2 className="size-4" /> {googleMessage}
+
+          {loadingGoogle ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> Loading settings...
+            </div>
+          ) : (
+            <div className="grid lg:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Section heading</label>
+                  <input
+                    type="text"
+                    name="section_heading"
+                    value={activeGoogleSettings.section_heading}
+                    onChange={handleGoogleChange}
+                    className="w-full h-12 rounded-2xl border px-4 bg-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Average rating (0–5)</label>
+                  <input
+                    type="number"
+                    name="average_rating"
+                    min={0}
+                    max={5}
+                    step={0.1}
+                    value={activeGoogleSettings.average_rating}
+                    onChange={handleGoogleChange}
+                    className="w-full h-12 rounded-2xl border px-4 bg-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Review count label</label>
+                  <input
+                    type="text"
+                    name="review_count_label"
+                    value={activeGoogleSettings.review_count_label}
+                    onChange={handleGoogleChange}
+                    className="w-full h-12 rounded-2xl border px-4 bg-background"
+                    placeholder="Based on 1000+ reviews"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Google Maps link</label>
+                  <input
+                    type="url"
+                    name="google_profile_url"
+                    value={activeGoogleSettings.google_profile_url || ""}
+                    onChange={handleGoogleChange}
+                    className="w-full h-12 rounded-2xl border px-4 bg-background"
+                    placeholder="https://maps.app.goo.gl/..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Restaurant page and homepage — &quot;View on Google&quot; link.
+                  </p>
+                </div>
+                <Button
+                  onClick={saveGoogleSettings}
+                  disabled={savingGoogle}
+                  className="rounded-2xl h-12 px-6"
+                >
+                  {savingGoogle && <Loader2 className="size-4 animate-spin" />}
+                  {savingGoogle ? "Saving..." : "Save Google summary"}
+                </Button>
+              </div>
+
+              <div className="rounded-2xl border bg-muted/20 p-6 space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
+                  Live preview
+                </p>
+                <p className="text-sm text-muted-foreground">{activeGoogleSettings.section_heading}</p>
+                <p className="text-2xl font-semibold">
+                  <span className="text-amber-700">G</span>
+                  <span>oogle</span>
+                </p>
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl font-semibold tabular-nums">
+                    {activeGoogleSettings.average_rating.toFixed(1)}
+                  </span>
+                  <StarRating value={activeGoogleSettings.average_rating} size="lg" />
+                </div>
+                <p className="text-sm text-muted-foreground">{activeGoogleSettings.review_count_label}</p>
+              </div>
             </div>
           )}
-        </div>
+        </section>
+      )}
 
-        {loadingGoogle ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> Loading settings...
+      {(activeSection === "rooms" || activeSection === "tiffin") && (
+        <section className="rounded-3xl border bg-background p-6 md:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold">Google Maps link</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Used for &quot;View on Google Maps&quot; on the{" "}
+                {activeSection === "rooms" ? "Rooms" : "Tiffin Box"} page testimonials block.
+              </p>
+            </div>
+            {googleMessage && (
+              <div className="flex items-center gap-2 text-sm text-green-600">
+                <CheckCircle2 className="size-4" /> {googleMessage}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="grid lg:grid-cols-2 gap-8">
-            <div className="space-y-4">
+
+          {loadingGoogle ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> Loading settings...
+            </div>
+          ) : (
+            <div className="space-y-4 max-w-xl">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Section heading</label>
-                <input
-                  type="text"
-                  name="section_heading"
-                  value={googleSettings.section_heading}
-                  onChange={handleGoogleChange}
-                  className="w-full h-12 rounded-2xl border px-4 bg-background"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Average rating (0–5)</label>
-                <input
-                  type="number"
-                  name="average_rating"
-                  min={0}
-                  max={5}
-                  step={0.1}
-                  value={googleSettings.average_rating}
-                  onChange={handleGoogleChange}
-                  className="w-full h-12 rounded-2xl border px-4 bg-background"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Review count label</label>
-                <input
-                  type="text"
-                  name="review_count_label"
-                  value={googleSettings.review_count_label}
-                  onChange={handleGoogleChange}
-                  className="w-full h-12 rounded-2xl border px-4 bg-background"
-                  placeholder="Based on 1000+ reviews"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Google profile URL (optional)</label>
+                <label className="text-sm font-medium">Google Maps URL</label>
                 <input
                   type="url"
                   name="google_profile_url"
-                  value={googleSettings.google_profile_url || ""}
+                  value={activeGoogleSettings.google_profile_url || ""}
                   onChange={handleGoogleChange}
                   className="w-full h-12 rounded-2xl border px-4 bg-background"
-                  placeholder="https://..."
+                  placeholder="https://maps.app.goo.gl/..."
                 />
               </div>
               <Button
@@ -369,38 +507,25 @@ export default function ReviewsPage() {
                 className="rounded-2xl h-12 px-6"
               >
                 {savingGoogle && <Loader2 className="size-4 animate-spin" />}
-                {savingGoogle ? "Saving..." : "Save Google summary"}
+                {savingGoogle ? "Saving..." : "Save Maps link"}
               </Button>
             </div>
+          )}
+        </section>
+      )}
 
-            <div className="rounded-2xl border bg-muted/20 p-6 space-y-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
-                Live preview
-              </p>
-              <p className="text-sm text-muted-foreground">{googleSettings.section_heading}</p>
-              <p className="text-2xl font-semibold">
-                <span className="text-amber-700">G</span>
-                <span>oogle</span>
-              </p>
-              <div className="flex items-center gap-3">
-                <span className="text-4xl font-semibold tabular-nums">
-                  {googleSettings.average_rating.toFixed(1)}
-                </span>
-                <StarRating value={googleSettings.average_rating} size="lg" />
-              </div>
-              <p className="text-sm text-muted-foreground">{googleSettings.review_count_label}</p>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Website Reviews */}
       <section className="rounded-3xl border bg-background p-6 md:p-8 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold">Website Reviews</h2>
+            <h2 className="text-xl font-semibold">{sectionLabel(activeSection)} testimonials</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Copy-paste guest reviews here. Each entry is live on the website after you save.
+              These appear before the footer on the{" "}
+              {activeSection === "restaurant"
+                ? "Restaurant (and homepage)"
+                : activeSection === "rooms"
+                  ? "Rooms"
+                  : "Tiffin Box"}{" "}
+              page on the main site.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -420,13 +545,14 @@ export default function ReviewsPage() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" /> Loading reviews...
           </div>
-        ) : reviews.length === 0 ? (
+        ) : sectionReviews.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center border rounded-2xl border-dashed">
-            No reviews yet. Click Add review to paste your first testimonial.
+            No reviews for {sectionLabel(activeSection)} yet. Click Add review to paste your first
+            testimonial.
           </p>
         ) : (
           <div className="space-y-4">
-            {reviews.map((review) => (
+            {sectionReviews.map((review) => (
               <div
                 key={review.id}
                 className="rounded-2xl border p-5 flex flex-col sm:flex-row sm:items-start gap-4 justify-between"
@@ -483,6 +609,25 @@ export default function ReviewsPage() {
               </button>
             </div>
             <div className="p-6 space-y-5">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Section</label>
+                <select
+                  value={reviewForm.section}
+                  onChange={(e) =>
+                    setReviewForm((f) => ({
+                      ...f,
+                      section: e.target.value as ReviewSection,
+                    }))
+                  }
+                  className="w-full h-12 rounded-2xl border px-4 bg-background"
+                >
+                  {REVIEW_SECTIONS.map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {section.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Guest name</label>
                 <input
